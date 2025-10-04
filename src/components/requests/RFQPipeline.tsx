@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSWRConfig } from "swr";
 
 import {
   Card,
   CardBody,
   CardHeader,
   Chip,
+  Alert,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -20,10 +22,12 @@ import {
 import {
   PencilSquareIcon,
   TrashIcon,
-  PaperAirplaneIcon,
+  DocumentPlusIcon,
 } from "@heroicons/react/24/outline";
 
 import { useRFQs, useDeleteRFQ } from "@/hooks/requests";
+import type { RFQRow } from "@/hooks/requests";
+import { useCreatePurchaseOrder } from "@/hooks/orders/usePurchaseOrders";
 
 const columns = [
   "QUOTATION NO",
@@ -41,11 +45,58 @@ const formatCurrency = (value: number) =>
 export default function RFQPipeline() {
   const { rows, isLoading, isError, error, mutate } = useRFQs({ page: 1, pageSize: 10, sort: "createdAt:desc" });
   const { deleteRFQ } = useDeleteRFQ();
+  const { create: createPurchaseOrder, isLoading: isCreatingPo } = useCreatePurchaseOrder();
+  const { mutate: globalMutate } = useSWRConfig();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; quotationNo: string } | null>(null);
   const [editTarget, setEditTarget] = useState<{ id: string; note: string } | null>(null);
-  const [poTarget, setPoTarget] = useState<{ id: string; quotationNo: string } | null>(null);
+  const [creatingPoId, setCreatingPoId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [poAlert, setPoAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  useEffect(() => {
+    if (!poAlert) return;
+    const timeout = window.setTimeout(() => setPoAlert(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [poAlert]);
+
+  const handleCreatePo = async (row: RFQRow) => {
+    if (!row.vendorId) {
+      setPoAlert({ type: "error", message: "RFQ is missing vendor information." });
+      return;
+    }
+
+    try {
+      setCreatingPoId(row.id);
+      const payload = {
+        rfqId: row.id,
+        vendorId: row.vendorId,
+        currency: "SAR",
+        vatPct: row.vatPct ?? 15,
+        items: [
+          {
+            materialId: undefined,
+            name: row.requestCode ? `${row.requestCode}` : row.quotationNo,
+            qty: row.qty > 0 ? row.qty : 1,
+            unit: "PC" as const,
+            unitPrice: row.unitPrice >= 0 ? row.unitPrice : 0,
+            note: row.note ?? undefined,
+          },
+        ],
+      };
+
+      const response = await createPurchaseOrder(payload);
+
+      setPoAlert({ type: "success", message: `Purchase Order ${response.poNo} created successfully.` });
+      await mutate();
+      globalMutate((key) => typeof key === "string" && key.startsWith("/api/purchase-orders"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to create purchase order";
+      setPoAlert({ type: "error", message });
+    } finally {
+      setCreatingPoId(null);
+    }
+  };
 
   const renderBody = () => {
     if (isLoading) {
@@ -144,10 +195,11 @@ export default function RFQPipeline() {
             <IconButton
               variant="text"
               color="green"
-              aria-label="Send PO"
-              onClick={() => setPoTarget({ id: row.id, quotationNo: row.quotationNo })}
+              aria-label="Create Purchase Order"
+              disabled={creatingPoId === row.id || isCreatingPo}
+              onClick={() => handleCreatePo(row)}
             >
-              <PaperAirplaneIcon className="tw-h-5 tw-w-5" />
+              <DocumentPlusIcon className={`tw-h-5 tw-w-5 ${creatingPoId === row.id ? "tw-animate-pulse" : ""}`} />
             </IconButton>
           </div>
         </td>
@@ -173,6 +225,11 @@ export default function RFQPipeline() {
           </div>
         </CardHeader>
         <CardBody className="tw-overflow-x-auto tw-p-0">
+          {poAlert ? (
+            <Alert color={poAlert.type === "success" ? "green" : "red"} className="tw-mx-6 tw-mt-6">
+              {poAlert.message}
+            </Alert>
+          ) : null}
           <table className="tw-min-w-max tw-w-full tw-table-auto">
             <thead>
               <tr>
@@ -287,27 +344,6 @@ export default function RFQPipeline() {
           </Button>
           <Button color="gray" onClick={() => setEditTarget(null)}>
             Save
-          </Button>
-        </DialogFooter>
-      </Dialog>
-
-      <Dialog open={Boolean(poTarget)} handler={() => setPoTarget(null)} size="sm">
-        <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
-          <Typography variant="h5" color="blue-gray">
-            Send Purchase Order
-          </Typography>
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            This feature will be available soon.
-          </Typography>
-        </DialogHeader>
-        <DialogBody>
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            {poTarget?.quotationNo} cannot be sent yet. Please check back later.
-          </Typography>
-        </DialogBody>
-        <DialogFooter className="tw-flex tw-gap-3">
-          <Button color="gray" onClick={() => setPoTarget(null)}>
-            Close
           </Button>
         </DialogFooter>
       </Dialog>
