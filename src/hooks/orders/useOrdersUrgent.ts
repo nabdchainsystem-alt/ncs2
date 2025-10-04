@@ -3,7 +3,12 @@
 import { useCallback } from "react";
 import useSWR from "swr";
 
-import { useOrdersOverviewKpis } from "./useOrdersOverviewKpis";
+export type UrgentKpisResponse = {
+  totalOrders: number;
+  openOrders: number;
+  closedOrders: number;
+  topSpendDept: string;
+};
 
 export type UrgentStatusSeries = Array<{
   name: string;
@@ -18,6 +23,15 @@ export type UrgentStatusResponse = {
 export type UrgentByDeptResponse = {
   labels: string[];
   data: number[];
+  topDepartment: string;
+  topDepartmentPct: number;
+};
+
+const DEFAULT_KPIS: UrgentKpisResponse = {
+  totalOrders: 0,
+  openOrders: 0,
+  closedOrders: 0,
+  topSpendDept: "—",
 };
 
 const DEFAULT_STATUS: UrgentStatusResponse = {
@@ -34,6 +48,8 @@ const DEFAULT_STATUS: UrgentStatusResponse = {
 const DEFAULT_BY_DEPT: UrgentByDeptResponse = {
   labels: [],
   data: [],
+  topDepartment: "—",
+  topDepartmentPct: 0,
 };
 
 const fetchJson = async <T,>(url: string, fallback: T) => {
@@ -50,6 +66,16 @@ const fetchJson = async <T,>(url: string, fallback: T) => {
 
 export function useOrdersUrgent(period: "daily" | "weekly" | "monthly" = "monthly") {
   const {
+    data: kpis,
+    error: kpisError,
+    isLoading: kpisLoading,
+    mutate: mutateKpis,
+  } = useSWR<UrgentKpisResponse>(
+    "/api/aggregates/orders/urgent-kpis",
+    (url) => fetchJson(url, DEFAULT_KPIS)
+  );
+
+  const {
     data: status,
     error: statusError,
     isLoading: statusLoading,
@@ -65,19 +91,16 @@ export function useOrdersUrgent(period: "daily" | "weekly" | "monthly" = "monthl
     isLoading: byDeptLoading,
     mutate: mutateByDept,
   } = useSWR<UrgentByDeptResponse>(
-    "/api/aggregates/orders/urgent-by-dept",
+    "/api/aggregates/orders/spend/by-department",
     (url) => fetchJson(url, DEFAULT_BY_DEPT)
   );
 
-  const { data: kpis, error: kpisError, isLoading: kpisLoading, mutate: mutateKpis } =
-    useOrdersOverviewKpis();
-
   const mutate = useCallback(() => {
-    return Promise.all([mutateStatus(), mutateByDept(), mutateKpis()]);
+    return Promise.all([mutateKpis(), mutateStatus(), mutateByDept()]);
   }, [mutateByDept, mutateKpis, mutateStatus]);
 
   return {
-    kpis,
+    kpis: kpis ?? DEFAULT_KPIS,
     status: status ?? DEFAULT_STATUS,
     byDept: byDept ?? DEFAULT_BY_DEPT,
     isLoading: kpisLoading || statusLoading || byDeptLoading,

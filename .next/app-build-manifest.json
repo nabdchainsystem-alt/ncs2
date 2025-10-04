@@ -11,25 +11,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/supply-chain/orders/page.js"
     ],
-    "/dashboard/overview/page": [
+    "/not-found": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/overview/page.js"
-    ],
-    "/supply-chain/requests/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/supply-chain/requests/page.js"
-    ],
-    "/supply-chain/warehouse/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/supply-chain/warehouse/page.js"
-    ],
-    "/supply-chain/vendors/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/supply-chain/vendors/page.js"
+      "static/chunks/app/not-found.js"
     ]
   }
 }
