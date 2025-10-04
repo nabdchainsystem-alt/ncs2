@@ -4,7 +4,9 @@ import useSWR from "swr";
 import { useDepartments, useWarehouses, useMaterials, useVendors, useMachines } from "@/hooks/data";
 import type { RequestRowDto, RequestDetailDto } from "./types";
 export { useRequests } from "./useRequests";
+export { useRFQs, useCreateRFQ, useDeleteRFQ } from "./useRFQs";
 export type { RequestRow, PageDto } from "./useRequests";
+export type { RFQRow } from "./useRFQs";
 export type { RequestRowDto, RequestDetailDto } from "./types";
 
 export function useRequest(id: string | null) {

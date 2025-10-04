@@ -1,12 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import useSWR from "swr";
 
 import {
   Card,
   CardBody,
   CardHeader,
+  IconButton,
   Timeline,
   TimelineBody,
   TimelineConnector,
@@ -21,7 +22,9 @@ import {
   CheckCircleIcon,
   TrashIcon,
   PlusCircleIcon,
+  ClipboardDocumentListIcon as ClipboardDocumentListSolid,
 } from "@heroicons/react/24/solid";
+import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 
 type IconComponent = React.ComponentType<React.ComponentProps<typeof PlusCircleIcon>>;
 
@@ -32,6 +35,7 @@ const iconMap: Record<string, IconComponent> = {
   "Request Created": PlusCircleIcon,
   "Status Updated": ArrowPathIcon,
   "Request Deleted": TrashIcon,
+  "RFQ Created": ClipboardDocumentListSolid,
 };
 
 const statusColorMap: Record<RequestStatusValue, string> = {
@@ -66,19 +70,53 @@ export default function RecentActivities() {
   });
 
   const activities = data ?? [];
+  const pageSize = 4;
+  const totalPages = Math.max(1, Math.ceil(activities.length / pageSize));
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    setPage((prev) => Math.min(prev, Math.max(0, totalPages - 1)));
+  }, [totalPages]);
 
   return (
     <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm">
-      <CardHeader floated={false} shadow={false} color="transparent">
-        <Typography variant="h6" color="blue-gray" className="tw-mb-2">
-          Recent Activities
-        </Typography>
-        <Typography
-          variant="small"
-          className="!tw-font-normal !tw-text-blue-gray-500"
-        >
-          Latest changes across requests
-        </Typography>
+      <CardHeader
+        floated={false}
+        shadow={false}
+        color="transparent"
+        className="tw-flex tw-items-start tw-justify-between tw-gap-3"
+      >
+        <div>
+          <Typography variant="h6" color="blue-gray" className="tw-mb-2">
+            Recent Activities
+          </Typography>
+          <Typography
+            variant="small"
+            className="!tw-font-normal !tw-text-blue-gray-500"
+          >
+            Latest changes across requests
+          </Typography>
+        </div>
+        <div className="tw-flex tw-items-center tw-gap-1">
+          <IconButton
+            variant="text"
+            color="blue-gray"
+            aria-label="Previous activities"
+            onClick={() => setPage((prev) => Math.max(0, prev - 1))}
+            disabled={page <= 0}
+          >
+            <ChevronLeftIcon className="tw-h-5 tw-w-5" />
+          </IconButton>
+          <IconButton
+            variant="text"
+            color="blue-gray"
+            aria-label="Next activities"
+            onClick={() => setPage((prev) => Math.min(totalPages - 1, prev + 1))}
+            disabled={page >= totalPages - 1}
+          >
+            <ChevronRightIcon className="tw-h-5 tw-w-5" />
+          </IconButton>
+        </div>
       </CardHeader>
       <CardBody>
         {error ? (
@@ -91,7 +129,9 @@ export default function RecentActivities() {
           </Typography>
         ) : (
           <Timeline>
-            {activities.map((activity, idx) => {
+            {activities
+              .slice(page * pageSize, page * pageSize + pageSize)
+              .map((activity, idx, sliced) => {
               const Icon = iconMap[activity.action] ?? (CheckCircleIcon as IconComponent);
               const statusColor =
                 (activity.status && statusColorMap[activity.status as RequestStatusValue]) ||
@@ -107,7 +147,7 @@ export default function RecentActivities() {
 
               return (
                 <TimelineItem key={activity.id}>
-                  {idx !== activities.length - 1 && (
+                  {idx !== sliced.length - 1 && (
                     <TimelineConnector className="!tw-scale-y-125 !tw-opacity-50" />
                   )}
                   <TimelineHeader>
@@ -146,7 +186,7 @@ export default function RecentActivities() {
                       ) : null}
                     </div>
                   </TimelineHeader>
-                  {idx !== activities.length - 1 && <TimelineBody>&nbsp;</TimelineBody>}
+                  {idx !== sliced.length - 1 && <TimelineBody>&nbsp;</TimelineBody>}
                 </TimelineItem>
               );
             })}

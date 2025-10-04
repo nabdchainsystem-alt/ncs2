@@ -7,6 +7,7 @@ import {
   CardBody,
   CardHeader,
   Typography,
+  Chip,
 } from "@/components/MaterialTailwind";
 import { VerticalBarChart } from "@/widgets/charts";
 
@@ -27,17 +28,21 @@ export default function UrgentDepartmentsChart() {
 
   const labels = data?.labels ?? [];
   const values = data?.data ?? [];
-
-  const totalUrgent = values.reduce((sum, value) => sum + value, 0);
-  const topIndex = values.reduce(
-    (best, value, index, array) => (value > array[best] ? index : best),
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const mostUrgentIndex = values.reduce(
+    (highest, value, index, array) => (value > array[highest] ? index : highest),
     0
   );
-  const topDepartment = values.length ? labels[topIndex] : null;
+  const mostUrgentDepartment = labels[mostUrgentIndex];
+  const mostUrgentPercentage = total > 0 ? Math.round((values[mostUrgentIndex] / total) * 100) : 0;
 
   return (
     <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm">
-      <CardHeader floated={false} shadow={false} className="tw-flex tw-flex-col tw-gap-1 tw-rounded-none tw-border-b tw-border-blue-gray-50 tw-p-6">
+      <CardHeader
+        floated={false}
+        shadow={false}
+        className="tw-flex tw-flex-col tw-gap-1 tw-rounded-none tw-border-b tw-border-blue-gray-50 tw-p-6 !tw-items-start"
+      >
         <Typography variant="h6" color="blue-gray">
           Urgent Requests by Department
         </Typography>
@@ -71,17 +76,22 @@ export default function UrgentDepartmentsChart() {
               }}
             />
             <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
-              <Typography variant="h6" color="blue-gray">
-                {totalUrgent} urgent requests
-              </Typography>
               <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-                {topDepartment
-                  ? `${topDepartment} currently carries the heaviest urgent workload.`
-                  : "Monitor departmental workload to keep escalations on track."}
+                Total urgent requests today
               </Typography>
-              <Typography variant="small" className="tw-mt-2 !tw-font-normal !tw-text-blue-gray-400">
-                Updated just now
-              </Typography>
+              <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+                <Typography variant="h6" color="blue-gray">
+                  {total}
+                </Typography>
+                {mostUrgentDepartment ? (
+                  <Chip
+                    value={`${mostUrgentPercentage}% ${mostUrgentDepartment}`}
+                    color="red"
+                    variant="ghost"
+                    className="tw-w-fit tw-text-xs !tw-font-semibold"
+                  />
+                ) : null}
+              </div>
             </div>
           </div>
         )}

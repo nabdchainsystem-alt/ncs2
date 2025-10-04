@@ -96,6 +96,16 @@ export async function POST(request: Request) {
       },
     });
 
+    if (created.requestId) {
+      await prisma.requestActivity.create({
+        data: {
+          requestId: created.requestId,
+          action: "Follow-up Scheduled",
+          detail: `${created.title} due on ${created.dueDate.toISOString().slice(0, 10)}`,
+        },
+      });
+    }
+
     return NextResponse.json(
       {
         id: created.id,

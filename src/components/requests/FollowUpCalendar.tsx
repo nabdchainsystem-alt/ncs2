@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import useSWR from "swr";
 
 import {
@@ -79,22 +79,100 @@ export default function FollowUpCalendar() {
   const [formState, setFormState] = useState<FormState>(initialForm);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; content: string }>({
+    x: 0,
+    y: 0,
+    content: "",
+  });
+  const [showTooltip, setShowTooltip] = useState(false);
 
-  const events = useMemo(() => {
-    return (data ?? []).map((task) => {
-      const color = priorityColorMap[task.priority];
-      return {
-        id: task.id,
-        title: task.requestCode ? `${task.title} (${task.requestCode})` : task.title,
-        start: task.dueDate,
-        allDay: true,
-        backgroundColor: color,
-        borderColor: color,
-        textColor: "#0f172a",
-        extendedProps: task,
-      };
+  const { calendarEvents, groups, tooltips } = useMemo(() => {
+    const groups = new Map<string, FollowUp[]>();
+    (data ?? []).forEach((task) => {
+      const key = new Date(task.dueDate).toISOString().split("T")[0];
+      const list = groups.get(key) ?? [];
+      list.push(task);
+      groups.set(key, list);
     });
+
+    const calendarEvents = (data ?? []).map((task) => ({
+      id: task.id,
+      title: "dot",
+      start: task.dueDate,
+      allDay: true,
+      extendedProps: task,
+    }));
+
+    const tooltipMap = new Map<string, string>();
+    groups.forEach((items, key) => {
+      const lines = items.map((item) => {
+        const code = item.requestCode ? ` (${item.requestCode})` : "";
+        return `${item.priority}: ${item.title}${code}`;
+      });
+      tooltipMap.set(key, lines.join("\n"));
+    });
+
+    return { calendarEvents, groups, tooltips: tooltipMap };
   }, [data]);
+
+  const renderEventContent = useCallback(() => null, []);
+
+  const handleDayCellMount = useCallback(
+    (arg: any) => {
+      const key = arg.date.toISOString().split("T")[0];
+      const items = groups.get(key);
+      const wrapper = arg.el.querySelector(".followup-dot-row");
+      if (wrapper) {
+        wrapper.remove();
+      }
+
+      if (!items || !items.length) {
+        return;
+      }
+
+      const row = document.createElement("div");
+      row.className = "followup-dot-row tw-flex tw-justify-center tw-gap-1 tw-pt-1";
+
+      items.forEach((item) => {
+        const dot = document.createElement("span");
+        dot.className = "tw-inline-flex tw-h-2 tw-w-2 tw-rounded-full";
+        dot.style.backgroundColor = priorityColorMap[item.priority];
+        dot.addEventListener("mouseenter", (event) => {
+          if (!containerRef.current) return;
+          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+          const containerRect = containerRef.current.getBoundingClientRect();
+          const lines = items.map((line) => {
+            const code = line.requestCode ? ` (${line.requestCode})` : "";
+            return `${line.priority}: ${line.title}${code}`;
+          });
+          setTooltip({
+            content: lines.join("\n"),
+            x: rect.left - containerRect.left + rect.width / 2,
+            y: rect.top - containerRect.top - 8,
+          });
+          setShowTooltip(true);
+        });
+        dot.addEventListener("mouseleave", () => setShowTooltip(false));
+        row.appendChild(dot);
+      });
+
+      const bottom = arg.el.querySelector(".fc-daygrid-day-frame");
+      if (bottom) {
+        bottom.appendChild(row);
+      } else {
+        arg.el.appendChild(row);
+      }
+    },
+    [groups]
+  );
+
+  const handleDayCellUnmount = useCallback((arg: any) => {
+    const wrapper = arg.el.querySelector(".followup-dot-row");
+    if (wrapper) {
+      wrapper.remove();
+    }
+  }, []);
 
   const handleSubmit = async () => {
     try {
@@ -145,7 +223,7 @@ export default function FollowUpCalendar() {
       <CardHeader
         floated={false}
         shadow={false}
-        className="tw-flex tw-items-center tw-justify-between tw-rounded-none tw-border-b tw-border-blue-gray-50 tw-p-6"
+        className="tw-flex tw-items-start tw-justify-between tw-rounded-none tw-border-b tw-border-blue-gray-50 tw-px-6 tw-pt-5 tw-pb-4"
       >
         <div className="tw-flex tw-flex-col">
           <Typography variant="h6" color="blue-gray">
@@ -159,7 +237,7 @@ export default function FollowUpCalendar() {
           <PlusIcon className="tw-h-5 tw-w-5" />
         </IconButton>
       </CardHeader>
-      <CardBody className="tw-p-0">
+      <CardBody ref={containerRef} className="tw-px-4 tw-pt-2 tw-pb-4 tw-relative">
         {error ? (
           <Typography variant="small" className="!tw-font-normal !tw-text-red-500 tw-p-6">
             Unable to load follow-ups
@@ -168,11 +246,29 @@ export default function FollowUpCalendar() {
           <FullCalendar
             plugins={[dayGridPlugin]}
             initialView="dayGridMonth"
-            events={events}
-            height={450}
-            headerToolbar={{ start: "prev,next today", center: "title", end: "" }}
+            key={(data?.length ?? 0) + JSON.stringify(groups.size)}
+            events={calendarEvents}
+            height={360}
+            headerToolbar={{ start: "prev,next today", center: "", end: "title" }}
+            showNonCurrentDates={false}
+            fixedWeekCount={false}
+            eventContent={renderEventContent}
+            dayCellDidMount={handleDayCellMount}
+            dayCellWillUnmount={handleDayCellUnmount}
           />
         )}
+        {showTooltip ? (
+          <div
+            className="tw-pointer-events-none tw-absolute tw-z-50 tw-max-w-[240px] tw-rounded-lg tw-border tw-border-blue-gray-100 tw-bg-white tw-px-3 tw-py-2 tw-text-xs tw-text-blue-gray-600 tw-shadow-lg"
+            style={{ left: tooltip.x, top: tooltip.y, transform: "translate(-50%, -100%)" }}
+          >
+            {tooltip.content.split("\n").map((line, idx) => (
+              <div key={idx} className="tw-whitespace-nowrap">
+                {line}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </CardBody>
 
       <Dialog open={open} handler={() => setOpen(false)} size="md">

@@ -20,9 +20,13 @@ import { useRequests } from "@/hooks/requests";
 import type { RequestRow } from "@/hooks/requests";
 import NewRequestModal from "@/components/requests/modals/NewRequestModal";
 import ViewRequestModal from "@/components/requests/modals/ViewRequestModal";
+import CreateRfqModal from "@/components/requests/modals/CreateRfqModal";
 import {
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
   ClipboardDocumentListIcon,
   PencilSquareIcon,
+  PlusIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
 
@@ -71,6 +75,10 @@ export default function AllRequestsTable() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [rfqModal, setRfqModal] = useState<{ open: boolean; requestId: string | null }>({
+    open: false,
+    requestId: null,
+  });
 
   const pageSize = 10;
 
@@ -204,8 +212,9 @@ export default function AllRequestsTable() {
             <IconButton
               variant="text"
               color="green"
-              onClick={() => console.info("RFQ action", row.id)}
+              onClick={() => setRfqModal({ open: true, requestId: row.id })}
               size="sm"
+              aria-label="Create RFQ"
             >
               <ClipboardDocumentListIcon className="tw-h-4 tw-w-4" />
             </IconButton>
@@ -232,12 +241,32 @@ export default function AllRequestsTable() {
             </Typography>
           </div>
           <div className="tw-flex tw-flex-col tw-gap-3 md:tw-flex-row md:tw-items-center">
-            <Button variant="outlined" color="blue-gray" disabled>
-              Import
-            </Button>
-            <Button color="gray" onClick={() => setNewModalOpen(true)}>
-              New Request
-            </Button>
+            <div className="tw-flex tw-items-center tw-gap-2">
+              <IconButton
+                variant="text"
+                color="blue-gray"
+                onClick={() => console.info("Import action")}
+                aria-label="Import"
+              >
+                <ArrowDownTrayIcon className="tw-h-5 tw-w-5" />
+              </IconButton>
+              <IconButton
+                variant="text"
+                color="blue-gray"
+                onClick={() => console.info("Export action")}
+                aria-label="Export"
+              >
+                <ArrowUpTrayIcon className="tw-h-5 tw-w-5" />
+              </IconButton>
+              <IconButton
+                variant="text"
+                color="blue-gray"
+                onClick={() => setNewModalOpen(true)}
+                aria-label="New request"
+              >
+                <PlusIcon className="tw-h-5 tw-w-5" />
+              </IconButton>
+            </div>
             <Input
               label="Search"
               variant="outlined"
@@ -310,6 +339,15 @@ export default function AllRequestsTable() {
         open={Boolean(viewRequestId)}
         requestId={viewRequestId}
         onClose={() => setViewRequestId(null)}
+      />
+
+      <CreateRfqModal
+        open={rfqModal.open}
+        requestId={rfqModal.requestId}
+        onClose={() => setRfqModal({ open: false, requestId: null })}
+        onCreated={async () => {
+          await mutate();
+        }}
       />
 
       <Dialog
