@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { POStatus, Prisma, Priority } from "@prisma/client";
+import {
+  POStatus,
+  Prisma,
+  Priority,
+  TransferInventoryStatus,
+} from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
@@ -83,6 +88,23 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const payload = await request.json();
     const data = updateSchema.parse(payload);
 
+    const existing = await prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: {
+        vendor: { select: { id: true, nameEn: true } },
+        rfq: { include: { request: { select: { priority: true } } } },
+        items: {
+          include: {
+            material: { select: { code: true } },
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+    }
+
     const updateData: Prisma.PurchaseOrderUpdateInput = {};
     if (data.status !== undefined) {
       updateData.status = data.status;
@@ -91,22 +113,78 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       updateData.priority = data.priority;
     }
 
-    const updated = await prisma.purchaseOrder.update({
-      where: { id },
-      data: updateData,
-      select: { id: true },
-    }).catch((error) => {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-        return null;
-      }
-      throw error;
-    });
+    const priorityForInventory = data.priority ?? existing.priority;
+
+    const updated = await prisma
+      .$transaction(async (tx) => {
+        const result = await tx.purchaseOrder.update({
+          where: { id },
+          data: updateData,
+          select: { id: true, status: true },
+        });
+
+        if (
+          data.status === POStatus.RECEIVED &&
+          existing.status !== POStatus.RECEIVED
+        ) {
+          const existingTransfers = await tx.completedOrderTransfer.findMany({
+            where: { poId: id },
+            select: { poItemId: true },
+          });
+          const existingItemIds = new Set(
+            existingTransfers.map((transfer) => transfer.poItemId)
+          );
+
+          const inventoryStatus = mapPriorityToInventoryStatus(
+            existing.rfq.request?.priority ?? priorityForInventory
+          );
+
+          const transfersToCreate = existing.items
+            .filter((item) => !existingItemIds.has(item.id))
+            .map((item) => ({
+              poId: id,
+              poItemId: item.id,
+              poNo: existing.poNo,
+              vendorId: existing.vendor.id,
+              vendorName: existing.vendor.nameEn,
+              requestPriority:
+                existing.rfq.request?.priority ?? priorityForInventory,
+              materialCode: item.material?.code ?? null,
+              itemName: item.name,
+              qty: item.qty,
+              unit: item.unit,
+              unitPrice: item.unitPrice,
+              lineTotal: item.lineTotal,
+              inventoryStatus,
+            }));
+
+          if (transfersToCreate.length > 0) {
+            await tx.completedOrderTransfer.createMany({
+              data: transfersToCreate,
+            });
+          }
+        }
+
+        return result;
+      })
+      .catch((error) => {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          return null;
+        }
+        throw error;
+      });
 
     if (!updated) {
       return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
     }
 
-    return NextResponse.json(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(null, {
+      status: 204,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     console.error(`PATCH /api/purchase-orders/:id`, error);
     if (error instanceof z.ZodError) {
@@ -114,4 +192,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
     return NextResponse.json({ message: "Internal server error" }, { status: 500 });
   }
+}
+
+function mapPriorityToInventoryStatus(priority: Priority | null | undefined) {
+  if (!priority) {
+    return TransferInventoryStatus.NORMAL;
+  }
+  if (priority === Priority.Urgent) {
+    return TransferInventoryStatus.OUT;
+  }
+  if (priority === Priority.High) {
+    return TransferInventoryStatus.LOW;
+  }
+  return TransferInventoryStatus.NORMAL;
 }

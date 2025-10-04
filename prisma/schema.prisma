@@ -210,6 +210,17 @@ enum POStatus {
   CANCELLED
 }
 
+enum TransferStatus {
+  PENDING
+  PROCESSED
+}
+
+enum TransferInventoryStatus {
+  NORMAL
+  LOW
+  OUT
+}
+
 model PurchaseOrder {
   id        String   @id @default(cuid())
   poNo      String   @unique
@@ -230,6 +241,7 @@ model PurchaseOrder {
   rfq    RFQ    @relation(fields: [rfqId], references: [id])
   items  POItem[]
   followUps PurchaseOrderFollowUp[]
+  completedTransfers CompletedOrderTransfer[] @relation("PurchaseOrderCompletedTransfers")
 
   @@index([vendorId])
   @@index([rfqId])
@@ -248,8 +260,37 @@ model POItem {
 
   material Material?      @relation(fields: [materialId], references: [id])
   po       PurchaseOrder  @relation(fields: [poId], references: [id])
+  completedTransfer CompletedOrderTransfer? @relation("POItemCompletedTransfer")
 
   @@index([poId])
+}
+
+model CompletedOrderTransfer {
+  id                String                   @id @default(cuid())
+  poId              String
+  poItemId          String
+  poNo              String
+  vendorId          String
+  vendorName        String
+  requestPriority   Priority
+  materialCode      String?
+  itemName          String
+  qty               Decimal
+  unit              String
+  unitPrice         Decimal
+  lineTotal         Decimal
+  transferStatus    TransferStatus           @default(PENDING)
+  inventoryStatus   TransferInventoryStatus  @default(NORMAL)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  purchaseOrder     PurchaseOrder            @relation("PurchaseOrderCompletedTransfers", fields: [poId], references: [id])
+  purchaseOrderItem POItem                   @relation("POItemCompletedTransfer", fields: [poItemId], references: [id])
+
+  @@unique([poItemId])
+  @@index([poId])
+  @@index([transferStatus])
+  @@index([inventoryStatus])
 }
 
 model PurchaseOrderFollowUp {
