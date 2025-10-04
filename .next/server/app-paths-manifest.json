@@ -1,0 +1,15 @@
+{
+  "/not-found": "app/not-found.js",
+  "/api/requests/metrics/route": "app/api/requests/metrics/route.js",
+  "/supply-chain/requests/page": "app/supply-chain/requests/page.js",
+  "/api/requests/activities/route": "app/api/requests/activities/route.js",
+  "/dashboard/overview/page": "app/dashboard/overview/page.js",
+  "/api/requests/analytics/urgent-by-department/route": "app/api/requests/analytics/urgent-by-department/route.js",
+  "/api/requests/follow-ups/route": "app/api/requests/follow-ups/route.js",
+  "/api/departments/route": "app/api/departments/route.js",
+  "/api/warehouses/route": "app/api/warehouses/route.js",
+  "/api/machines/route": "app/api/machines/route.js",
+  "/api/materials/route": "app/api/materials/route.js",
+  "/api/vendors/route": "app/api/vendors/route.js",
+  "/api/requests/route": "app/api/requests/route.js"
+}

@@ -1,0 +1,170 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Department {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  name      String
+  location  String?
+  machines  Machine[]
+  requests  Request[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Warehouse {
+  id        String     @id @default(cuid())
+  code      String     @unique
+  name      String
+  location  String?
+  sizeM2    Int?
+  materials Material[]
+  requests  Request[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Material {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String        @unique
+  unit         String
+  category     String
+  warehouseId  String?
+  warehouse    Warehouse?    @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  requestItems RequestItem[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Vendor {
+  id            String    @id @default(cuid())
+  category      String
+  subCategory   String?
+  nameEn        String
+  nameAr        String?
+  contactPerson String?
+  position      String?
+  phone         String?
+  email         String?
+  website       String?
+  companyNumber String?
+  address       String?
+  status        String?
+  cr            String?
+  crExpiry      DateTime?
+  vat           String?
+  vatExpiry     DateTime?
+  bank          String?
+  iban          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  requests      Request[]
+}
+
+model Machine {
+  id           String      @id @default(cuid())
+  code         String      @unique
+  name         String
+  status       String
+  notes        String?
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  requests     Request[]
+}
+
+enum RequestStatus {
+  OPEN
+  PENDING
+  CLOSED
+  CANCELLED
+}
+
+enum Priority {
+  Low
+  Normal
+  High
+  Urgent
+}
+
+model Request {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  departmentId String?
+  warehouseId  String?
+  machineId    String?
+  vendorId     String?
+  priority     Priority
+  neededBy     DateTime?
+  description  String?
+  status       RequestStatus @default(OPEN)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  department Department?   @relation(fields: [departmentId], references: [id])
+  warehouse  Warehouse?    @relation(fields: [warehouseId], references: [id])
+  machine    Machine?      @relation(fields: [machineId], references: [id])
+  vendor     Vendor?       @relation(fields: [vendorId], references: [id])
+  items      RequestItem[]
+  activities RequestActivity[]
+  followUps  RequestFollowUp[]
+}
+
+model RequestItem {
+  id         String  @id @default(cuid())
+  requestId  String
+  materialId String?
+  name       String?
+  qty        Float
+  unit       String
+  note       String?
+
+  material Material? @relation(fields: [materialId], references: [id])
+  request  Request   @relation(fields: [requestId], references: [id])
+
+  @@index([requestId])
+}
+
+model RequestActivity {
+  id        String   @id @default(cuid())
+  requestId String?
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  request Request? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([requestId])
+}
+
+model RequestFollowUp {
+  id        String   @id @default(cuid())
+  requestId String?
+  title     String
+  notes     String?
+  dueDate   DateTime
+  priority  Priority @default(Normal)
+  status    String   @default("Pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  request Request? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([dueDate])
+  @@index([requestId])
+}
