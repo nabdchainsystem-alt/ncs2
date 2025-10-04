@@ -14,15 +14,13 @@ import { VerticalBarChart } from "@/widgets/charts";
 type ResponseData = {
   labels: string[];
   data: number[];
-  topDepartment: string;
-  topDepartmentPct: number;
 };
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     if (response.status === 404) {
-      return { labels: [], data: [], topDepartment: "—", topDepartmentPct: 0 } as ResponseData;
+      return { labels: [], data: [] } as ResponseData;
     }
     throw new Error("Failed to load orders analytics");
   }
@@ -31,7 +29,7 @@ const fetcher = async (url: string) => {
 
 export default function OrdersByDeptChart() {
   const { data, error, isLoading } = useSWR<ResponseData>(
-    "/api/aggregates/orders/spend/by-department",
+    "/api/aggregates/orders/by-dept-urgent",
     fetcher,
     { refreshInterval: 60_000 }
   );
@@ -40,8 +38,12 @@ export default function OrdersByDeptChart() {
   const values = data?.data ?? [];
   const hasData = labels.length > 0 && values.some((value) => value > 0);
   const total = values.reduce((sum, value) => sum + value, 0);
-  const topDepartment = data?.topDepartment ?? "—";
-  const topPct = data?.topDepartmentPct ?? 0;
+  const dominantIndex = values.reduce(
+    (highest, value, index, array) => (value > array[highest] ? index : highest),
+    0
+  );
+  const dominantDept = labels[dominantIndex];
+  const dominantPct = total > 0 ? Math.round((values[dominantIndex] / total) * 100) : 0;
 
   return (
     <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm tw-h-full">
@@ -51,10 +53,10 @@ export default function OrdersByDeptChart() {
         className="tw-flex tw-flex-col tw-gap-1"
       >
         <Typography variant="h6" color="blue-gray">
-          Spend by Department
+          Urgent Orders by Department
         </Typography>
         <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-          Share of total purchase order spend
+          Distribution of urgent order volume
         </Typography>
       </CardHeader>
       <CardBody className="tw-space-y-4">
@@ -74,8 +76,8 @@ export default function OrdersByDeptChart() {
           <div className="tw-space-y-4">
             <VerticalBarChart
               height={300}
-              colors={["#3b82f6"]}
-              series={[{ name: "Spend", data: values }]}
+              colors={["#f87171"]}
+              series={[{ name: "Urgent", data: values }]}
               options={{
                 xaxis: {
                   categories: labels,
@@ -84,16 +86,16 @@ export default function OrdersByDeptChart() {
             />
             <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
               <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-                Total spend across departments
+                Total urgent orders today
               </Typography>
               <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
                 <Typography variant="h6" color="blue-gray">
-                  SAR {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {total}
                 </Typography>
-                {topDepartment ? (
+                {dominantDept ? (
                   <Chip
-                    value={`${Math.round(topPct)}% ${topDepartment}`}
-                    color="blue"
+                    value={`${dominantPct}% ${dominantDept}`}
+                    color="red"
                     variant="ghost"
                     className="tw-w-fit tw-text-xs !tw-font-semibold"
                   />

@@ -1,70 +1,75 @@
 import { NextResponse } from "next/server";
+
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
+const FALLBACK = {
+  totalOrders: 0,
+  openOrders: 0,
+  closedOrders: 0,
+  topSpendDept: "—",
+};
+
 export async function GET() {
   try {
-    const [totalStats, openStats, topSpend] = await Promise.all([
-      prisma.purchaseOrder.aggregate({
-        _count: { id: true },
-        _sum: { total: true },
+    const [totalOrders, openOrders, closedOrders, orders] = await Promise.all([
+      prisma.purchaseOrder.count(),
+      prisma.purchaseOrder.count({
+        where: { status: { in: ["OPEN", "PARTIAL"] } },
       }),
-      prisma.purchaseOrder.aggregate({
-        where: {
-          status: { in: ["OPEN", "PARTIAL"] },
-        },
-        _count: { id: true },
+      prisma.purchaseOrder.count({
+        where: { status: { in: ["RECEIVED", "CLOSED"] } },
       }),
-      prisma.purchaseOrder.groupBy({
-        by: ["rfqId"],
-        _sum: {
+      prisma.purchaseOrder.findMany({
+        select: {
           total: true,
+          rfq: {
+            select: {
+              request: {
+                select: {
+                  department: {
+                    select: { name: true },
+                  },
+                },
+              },
+            },
+          },
         },
       }),
     ]);
 
-    let topSpendDept = "—";
-    let topSpendValue: Prisma.Decimal | null = null;
+    const spendByDept = new Map<string, Prisma.Decimal>();
 
-    for (const entry of topSpend) {
-      const rfq = await prisma.rFQ.findUnique({
-        where: { id: entry.rfqId },
-        select: {
-          request: {
-            select: {
-              department: { select: { name: true } },
-            },
-          },
-        },
-      });
-      const departmentName = rfq?.request?.department?.name ?? "Unassigned";
-      const total = entry._sum.total ?? new Prisma.Decimal(0);
-      if (!topSpendValue || total.gt(topSpendValue)) {
-        topSpendValue = total;
-        topSpendDept = departmentName;
+    orders.forEach((order) => {
+      const departmentName = order.rfq.request?.department?.name ?? "Unassigned";
+      const current = spendByDept.get(departmentName) ?? new Prisma.Decimal(0);
+      spendByDept.set(departmentName, current.add(order.total ?? new Prisma.Decimal(0)));
+    });
+
+    let topSpendDept = "—";
+    let topValue = new Prisma.Decimal(0);
+
+    spendByDept.forEach((value, name) => {
+      if (value.gt(topValue)) {
+        topValue = value;
+        topSpendDept = name;
       }
-    }
+    });
 
     return NextResponse.json(
       {
-        totalOrders: totalStats._count.id ?? 0,
-        openOrders: openStats._count.id ?? 0,
-        closedOrders: (totalStats._count.id ?? 0) - (openStats._count.id ?? 0),
+        totalOrders,
+        openOrders,
+        closedOrders,
         topSpendDept,
       },
-      { headers: { "Cache-Control": "no-store" } }
+      {
+        headers: { "Cache-Control": "no-store" },
+      }
     );
   } catch (error) {
     console.error("GET /api/aggregates/orders/urgent-kpis", error);
-    return NextResponse.json(
-      {
-        totalOrders: 0,
-        openOrders: 0,
-        closedOrders: 0,
-        topSpendDept: "—",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json(FALLBACK, { status: 500 });
   }
 }

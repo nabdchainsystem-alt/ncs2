@@ -7,6 +7,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  Chip,
   Typography,
 } from "@/components/MaterialTailwind";
 import { useChartReady } from "./useChartReady";
@@ -44,6 +45,14 @@ type SpendDistributionResponse = {
   currency: string;
 };
 
+type DepartmentSpendResponse = {
+  labels: string[];
+  data: number[];
+  topDepartment: string;
+  topDepartmentPct: number;
+  currency: string;
+};
+
 const EMPTY_TABLE: SpendTableResponse = {
   rows: [],
   currency: "SAR",
@@ -52,6 +61,14 @@ const EMPTY_TABLE: SpendTableResponse = {
 const EMPTY_DISTRIBUTION: SpendDistributionResponse = {
   labels: [],
   data: [],
+  currency: "SAR",
+};
+
+const EMPTY_DEPARTMENT_SPEND: DepartmentSpendResponse = {
+  labels: [],
+  data: [],
+  topDepartment: "—",
+  topDepartmentPct: 0,
   currency: "SAR",
 };
 
@@ -77,6 +94,18 @@ async function fetchDistribution(url: string) {
     throw new Error(text || `Failed to load spend distribution for ${url}`);
   }
   return (await response.json()) as SpendDistributionResponse;
+}
+
+async function fetchDepartmentSpend(url: string) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (response.status === 404) {
+    return EMPTY_DEPARTMENT_SPEND;
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Failed to load department spend for ${url}`);
+  }
+  return (await response.json()) as DepartmentSpendResponse;
 }
 
 export default function SpendAnalysisClosedOrders() {
@@ -118,6 +147,15 @@ export default function SpendAnalysisClosedOrders() {
     fetchDistribution
   );
 
+  const {
+    data: departmentSpend,
+    error: departmentSpendError,
+    isLoading: departmentSpendLoading,
+  } = useSWR<DepartmentSpendResponse>(
+    "/api/aggregates/orders/spend/by-department",
+    fetchDepartmentSpend
+  );
+
   const materialRows = materials?.rows ?? [];
   const vendorRows = vendors?.rows ?? [];
 
@@ -129,6 +167,9 @@ export default function SpendAnalysisClosedOrders() {
   const vendorsDistributionHasData =
     (vendorsDistribution?.labels.length ?? 0) > 0 &&
     vendorsDistribution?.data.some((value) => value > 0);
+  const departmentSpendHasData =
+    (departmentSpend?.labels.length ?? 0) > 0 &&
+    departmentSpend?.data.some((value) => value > 0);
 
   const renderTableState = (
     isLoading: boolean,
@@ -374,15 +415,59 @@ export default function SpendAnalysisClosedOrders() {
         <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm xl:tw-col-span-6">
           <CardHeader floated={false} shadow={false} className="tw-flex tw-flex-col tw-gap-1">
             <Typography variant="h6" color="blue-gray">
-              Top Vendors by Spend (SAR)
+              Spend by Department
             </Typography>
           </CardHeader>
           <CardBody className="tw-space-y-4">
-            {renderDistributionState(
-              vendorsDistributionLoading,
-              vendorsDistributionError as Error | undefined,
-              Boolean(vendorsDistributionHasData),
-              vendorsDistribution ?? EMPTY_DISTRIBUTION
+            {departmentSpendError ? (
+              <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
+                Unable to load department spend data.
+              </Typography>
+            ) : departmentSpendLoading ? (
+              <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-400">
+                Loading chart…
+              </Typography>
+            ) : chartState === "pending" ? (
+              <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-400">
+                Preparing chart…
+              </Typography>
+            ) : chartState === "unsupported" ? (
+              <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-400">
+                Charts require ResizeObserver support
+              </Typography>
+            ) : !departmentSpendHasData || !departmentSpend ? (
+              <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-400">
+                No data available
+              </Typography>
+            ) : (
+              <div className="tw-space-y-4">
+                <VerticalBarChartComponent
+                  height={320}
+                  series={[{ name: "Spend", data: departmentSpend.data }]}
+                  options={{
+                    colors: ["#3b82f6"],
+                    xaxis: {
+                      categories: departmentSpend.labels,
+                    },
+                  }}
+                />
+                <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
+                  <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+                    Highest spending department
+                  </Typography>
+                  <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+                    <Typography variant="h6" color="blue-gray">
+                      {departmentSpend.topDepartment}
+                    </Typography>
+                    <Chip
+                      value={`${Math.round(departmentSpend.topDepartmentPct)}%`}
+                      color="blue"
+                      variant="ghost"
+                      className="tw-w-fit tw-text-xs !tw-font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
             )}
           </CardBody>
         </Card>

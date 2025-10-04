@@ -8,6 +8,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  Chip,
   Typography,
 } from "@/components/MaterialTailwind";
 import BlackBoxKpiCard from "@/components/ui/kpi/BlackBoxKpiCard";
@@ -16,8 +17,8 @@ import { useChartReady } from "./useChartReady";
 import {
   BuildingOffice2Icon,
   CheckCircleIcon,
-  ChartBarIcon,
   ClipboardDocumentCheckIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 
 type VerticalBarChartComponent =
@@ -39,7 +40,7 @@ const KPI_CARDS: Array<{
     key: "totalOrders",
     title: "Total Orders",
     subtitle: "All purchase orders to date",
-    icon: <ChartBarIcon className="tw-h-6 tw-w-6" />,
+    icon: <ExclamationTriangleIcon className="tw-h-6 tw-w-6" />,
   },
   {
     key: "openOrders",
@@ -93,6 +94,7 @@ export default function UrgentOrdersOverview() {
 
   const byDeptHasData =
     byDept.labels.length > 0 && byDept.data.some((value) => value > 0);
+  const deptTotal = byDept.data.reduce((sum, value) => sum + value, 0);
 
   return (
     <section className="tw-space-y-6">
@@ -106,24 +108,7 @@ export default function UrgentOrdersOverview() {
       ) : null}
       <div className="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 xl:tw-grid-cols-4 tw-gap-6">
         {KPI_CARDS.map((card) => {
-          let cardValue: number | string;
-
-          switch (card.key) {
-            case "totalOrders":
-              cardValue = kpis.totalOrders;
-              break;
-            case "openOrders":
-              cardValue = kpis.openOrders;
-              break;
-            case "closedOrders":
-              cardValue = kpis.closedOrders;
-              break;
-            case "topSpendDept":
-              cardValue = kpis.topSpendDept;
-              break;
-            default:
-              cardValue = 0;
-          }
+          const cardValue = kpis[card.key];
 
           return (
             <BlackBoxKpiCard
@@ -229,13 +214,13 @@ export default function UrgentOrdersOverview() {
         <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm xl:tw-col-span-6">
           <CardHeader floated={false} shadow={false} className="tw-flex tw-flex-col tw-gap-1">
             <Typography variant="h6" color="blue-gray">
-              Urgent Orders by Department
+              Spend by Department
             </Typography>
             <Typography
               variant="small"
               className="!tw-font-normal !tw-text-blue-gray-500"
             >
-              Comparison across departments
+              Purchase order spend distribution
             </Typography>
           </CardHeader>
           <CardBody className="tw-space-y-4">
@@ -268,16 +253,36 @@ export default function UrgentOrdersOverview() {
                 No data available
               </Typography>
             ) : (
-              <VerticalBarChart
-                height={320}
-                series={[{ name: "Urgent Orders", data: byDept.data }]}
-                colors={["#f87171"]}
-                options={{
-                  xaxis: {
-                    categories: byDept.labels,
-                  },
-                }}
-              />
+              <div className="tw-space-y-4">
+                <VerticalBarChart
+                  height={320}
+                  colors={["#3b82f6"]}
+                  series={[{ name: "Spend", data: byDept.data }]}
+                  options={{
+                    xaxis: {
+                      categories: byDept.labels,
+                    },
+                  }}
+                />
+                <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
+                  <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+                    Total spend across departments
+                  </Typography>
+                  <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+                    <Typography variant="h6" color="blue-gray">
+                      SAR {deptTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Typography>
+                    {byDept.topDepartment ? (
+                      <Chip
+                        value={`${Math.round(byDept.topDepartmentPct ?? 0)}% ${byDept.topDepartment}`}
+                        color="blue"
+                        variant="ghost"
+                        className="tw-w-fit tw-text-xs !tw-font-semibold"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             )}
           </CardBody>
         </Card>
