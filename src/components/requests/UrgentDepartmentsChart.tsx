@@ -28,6 +28,13 @@ export default function UrgentDepartmentsChart() {
   const labels = data?.labels ?? [];
   const values = data?.data ?? [];
 
+  const totalUrgent = values.reduce((sum, value) => sum + value, 0);
+  const topIndex = values.reduce(
+    (best, value, index, array) => (value > array[best] ? index : best),
+    0
+  );
+  const topDepartment = values.length ? labels[topIndex] : null;
+
   return (
     <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm">
       <CardHeader floated={false} shadow={false} className="tw-flex tw-flex-col tw-gap-1 tw-rounded-none tw-border-b tw-border-blue-gray-50 tw-p-6">
@@ -52,16 +59,31 @@ export default function UrgentDepartmentsChart() {
             No urgent requests recorded yet.
           </Typography>
         ) : (
-          <VerticalBarChart
-            height={300}
-            colors={["#f87171"]}
-            series={[{ name: "Urgent", data: values }]}
-            options={{
-              xaxis: {
-                categories: labels,
-              },
-            }}
-          />
+          <div className="tw-space-y-4">
+            <VerticalBarChart
+              height={300}
+              colors={["#f87171"]}
+              series={[{ name: "Urgent", data: values }]}
+              options={{
+                xaxis: {
+                  categories: labels,
+                },
+              }}
+            />
+            <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
+              <Typography variant="h6" color="blue-gray">
+                {totalUrgent} urgent requests
+              </Typography>
+              <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+                {topDepartment
+                  ? `${topDepartment} currently carries the heaviest urgent workload.`
+                  : "Monitor departmental workload to keep escalations on track."}
+              </Typography>
+              <Typography variant="small" className="tw-mt-2 !tw-font-normal !tw-text-blue-gray-400">
+                Updated just now
+              </Typography>
+            </div>
+          </div>
         )}
       </CardBody>
     </Card>

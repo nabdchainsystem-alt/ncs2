@@ -11,7 +11,7 @@ export default function RequestsPage() {
     <div className="tw-mt-8 tw-mb-4 tw-space-y-6">
       <Requestshero />
       <RequestsKpiBlock />
-      <div className="tw-grid tw-grid-cols-1 tw-gap-6 xl:tw-grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div className="tw-grid tw-grid-cols-1 tw-gap-6 xl:tw-grid-cols-[minmax(0,1.05fr)_minmax(0,1.25fr)_minmax(0,1.2fr)]">
         <RecentActivities />
         <UrgentDepartmentsChart />
         <FollowUpCalendar />
