@@ -5,6 +5,8 @@ import RFQPipeline from "@/components/requests/RFQPipeline";
 import RecentActivities from "@/components/requests/RecentActivities";
 import UrgentDepartmentsChart from "@/components/requests/UrgentDepartmentsChart";
 import FollowUpCalendar from "@/components/requests/FollowUpCalendar";
+import TotalRequestsCard from "@/components/requests/TotalRequestsCard";
+import RequestsDepartmentCharts from "@/components/requests/RequestsDepartmentCharts";
 
 export default function RequestsPage() {
   return (
@@ -18,6 +20,8 @@ export default function RequestsPage() {
       </div>
       <AllRequestsTable />
       <RFQPipeline />
+      <TotalRequestsCard />
+      <RequestsDepartmentCharts />
     </div>
   );
 }

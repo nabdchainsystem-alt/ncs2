@@ -1316,6 +1316,12 @@ video {
 .tw-max-w-xl{
   max-width: 36rem;
 }
+.tw-max-w-\[220px\]{
+  max-width: 220px;
+}
+.tw-max-w-\[240px\]{
+  max-width: 240px;
+}
 .tw-flex-none{
   flex: none;
 }
@@ -1467,6 +1473,9 @@ video {
 }
 .tw-place-items-center{
   place-items: center;
+}
+.\!tw-items-start{
+  align-items: flex-start !important;
 }
 .tw-items-start{
   align-items: flex-start;
@@ -1708,6 +1717,9 @@ video {
 }
 .tw-rounded-xl{
   border-radius: 0.75rem;
+}
+.tw-rounded{
+  border-radius: 0.25rem;
 }
 .tw-rounded-l-full{
   border-top-left-radius: 9999px;
@@ -4960,6 +4972,11 @@ th{
   color: rgb(255 255 255 / var(--tw-text-opacity));
 }
 
+.hover\:tw-text-blue-gray-700:hover{
+  --tw-text-opacity: 1;
+  color: rgb(69 90 100 / var(--tw-text-opacity));
+}
+
 .hover\:tw-opacity-100:hover{
   opacity: 1;
 }
@@ -5314,6 +5331,12 @@ th{
   box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
 }
 
+.focus\:tw-ring-2:focus{
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
 .focus\:tw-ring-amber-200:focus{
   --tw-ring-opacity: 1;
   --tw-ring-color: rgb(255 224 130 / var(--tw-ring-opacity));
@@ -5411,6 +5434,15 @@ th{
 .focus\:tw-ring-yellow-200:focus{
   --tw-ring-opacity: 1;
   --tw-ring-color: rgb(255 245 157 / var(--tw-ring-opacity));
+}
+
+.focus\:tw-ring-amber-500:focus{
+  --tw-ring-opacity: 1;
+  --tw-ring-color: rgb(255 193 7 / var(--tw-ring-opacity));
+}
+
+.focus\:tw-ring-offset-2:focus{
+  --tw-ring-offset-width: 2px;
 }
 
 .active\:tw-scale-100:active{
@@ -6622,10 +6654,6 @@ th{
 
   .xl\:tw-grid-cols-4{
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .xl\:tw-grid-cols-\[minmax\(0\2c 1\.05fr\)_minmax\(0\2c 1\.35fr\)_minmax\(0\2c 1\.1fr\)\]{
-    grid-template-columns: minmax(0,1.05fr) minmax(0,1.35fr) minmax(0,1.1fr);
   }
 
   .xl\:tw-grid-cols-\[minmax\(0\2c 1\.05fr\)_minmax\(0\2c 1\.25fr\)_minmax\(0\2c 1\.2fr\)\]{

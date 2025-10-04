@@ -19,15 +19,20 @@ export async function GET() {
   const tomorrowStart = new Date(todayStart.getTime() + MS_IN_DAY);
   const urgentWindowEnd = endOfDay(new Date(todayStart.getTime() + 3 * MS_IN_DAY));
   const todayEnd = endOfDay(now);
+  const yesterdayStart = new Date(todayStart.getTime() - MS_IN_DAY);
+  const yesterdayEnd = endOfDay(new Date(todayStart.getTime() - MS_IN_DAY));
+  const urgentPrevWindowStart = new Date(todayStart.getTime() - 3 * MS_IN_DAY);
 
   const [
     newRequestsToday,
     urgentRequestsToday,
-    urgentDueSoon,
-    followUpDueToday,
+    urgentFollowUpsSoon,
+    followUpsDueToday,
     newRequestsYesterday,
     urgentRequestsYesterday,
     totalOpenRequests,
+    urgentFollowUpsPrev,
+    followUpsDueYesterday,
   ] = await Promise.all([
     prisma.request.count({
       where: {
@@ -46,19 +51,18 @@ export async function GET() {
         },
       },
     }),
-    prisma.request.count({
+    prisma.requestFollowUp.count({
       where: {
         priority: Priority.Urgent,
-        neededBy: {
+        dueDate: {
           gte: todayStart,
           lte: urgentWindowEnd,
         },
       },
     }),
-    prisma.request.count({
+    prisma.requestFollowUp.count({
       where: {
-        status: RequestStatus.PENDING,
-        neededBy: {
+        dueDate: {
           gte: todayStart,
           lte: todayEnd,
         },
@@ -86,7 +90,27 @@ export async function GET() {
         status: { in: [RequestStatus.OPEN, RequestStatus.PENDING] },
       },
     }),
+    prisma.requestFollowUp.count({
+      where: {
+        priority: Priority.Urgent,
+        dueDate: {
+          gte: urgentPrevWindowStart,
+          lt: todayStart,
+        },
+      },
+    }),
+    prisma.requestFollowUp.count({
+      where: {
+        dueDate: {
+          gte: yesterdayStart,
+          lte: yesterdayEnd,
+        },
+      },
+    }),
   ]);
+
+  const urgentDueSoon = urgentFollowUpsSoon;
+  const followUpDueToday = followUpsDueToday;
 
   const delta = (current: number, previous: number) => {
     if (previous <= 0) {
@@ -104,8 +128,8 @@ export async function GET() {
       deltas: {
         newRequestsDelta: delta(newRequestsToday, newRequestsYesterday),
         urgentRequestsDelta: delta(urgentRequestsToday, urgentRequestsYesterday),
-        urgentDueSoonDelta: delta(urgentDueSoon, totalOpenRequests),
-        followUpDueDelta: delta(followUpDueToday, totalOpenRequests),
+        urgentDueSoonDelta: delta(urgentDueSoon, urgentFollowUpsPrev),
+        followUpDueDelta: delta(followUpDueToday, followUpsDueYesterday),
       },
     },
     { headers: { "Cache-Control": "no-store" } }
