@@ -3,13 +3,7 @@
 import dynamic from "next/dynamic";
 import useSWR from "swr";
 
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Typography,
-} from "@/components/MaterialTailwind";
+import { Card, CardBody, CardHeader, Typography } from "@/components/MaterialTailwind";
 import { useChartReady } from "./useChartReady";
 
 type BarChartComponent = typeof import("@/widgets/charts/vertical-bar-chart").default;
@@ -287,23 +281,49 @@ export default function SpendAnalysisClosedOrders() {
       );
     }
 
+    const total = data.data.reduce((sum, value) => sum + value, 0);
+    let topIndex = 0;
+    for (let i = 1; i < data.data.length; i += 1) {
+      if (data.data[i] > data.data[topIndex]) {
+        topIndex = i;
+      }
+    }
+    const topValue = data.data[topIndex] ?? 0;
+    const topLabel = data.labels[topIndex] ?? "—";
+    const percentage = total ? (topValue / total) * 100 : 0;
+
     return (
-      <VerticalBarChartComponent
-        height={320}
-        series={[{ name: "Spend", data: data.data }]}
-        options={{
-          xaxis: {
-            categories: data.labels,
-          },
-          legend: { show: false },
-          plotOptions: {
-            bar: {
-              columnWidth: "45%",
-              borderRadius: 4,
+      <div className="tw-space-y-4">
+        <VerticalBarChartComponent
+          height={320}
+          series={[{ name: "Spend", data: data.data }]}
+          options={{
+            xaxis: {
+              categories: data.labels,
             },
-          },
-        }}
-      />
+            legend: { show: false },
+            plotOptions: {
+              bar: {
+                columnWidth: "45%",
+                borderRadius: 4,
+              },
+            },
+          }}
+        />
+        <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
+          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+            Top material by spend
+          </Typography>
+          <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+            <Typography variant="h6" color="blue-gray">
+              {formatCurrency(topValue)}
+            </Typography>
+            <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-blue-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase tw-text-blue-700">
+              {`${Math.round(percentage)}% ${topLabel.toUpperCase()}`}
+            </span>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -459,12 +479,9 @@ export default function SpendAnalysisClosedOrders() {
                     <Typography variant="h6" color="blue-gray">
                       {departmentSpend.topDepartment}
                     </Typography>
-                    <Chip
-                      value={`${Math.round(departmentSpend.topDepartmentPct)}%`}
-                      color="blue"
-                      variant="ghost"
-                      className="tw-w-fit tw-text-xs !tw-font-semibold"
-                    />
+                    <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-blue-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase tw-text-blue-700">
+                      {`${Math.round(departmentSpend.topDepartmentPct)}%`}
+                    </span>
                   </div>
                 </div>
               </div>

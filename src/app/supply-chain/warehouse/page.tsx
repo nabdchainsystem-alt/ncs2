@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import useSWR from "swr";
 
 import {
@@ -10,9 +10,15 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  IconButton,
   Input,
   Option,
   Select,
+  Tooltip,
   Typography,
 } from "@/components/MaterialTailwind";
 import WarehouseHero from "@/components/warehouse/WarehouseHero";
@@ -20,6 +26,7 @@ import BlackBoxKpiCard from "@/components/ui/kpi/BlackBoxKpiCard";
 import {
   ArchiveBoxIcon,
   ArrowsRightLeftIcon,
+  ArrowDownTrayIcon,
   BanknotesIcon,
   BoltIcon,
   BuildingOffice2Icon,
@@ -38,6 +45,7 @@ import {
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useChartReady } from "@/components/orders/analytics/useChartReady";
+import { useMaterials } from "@/hooks/data";
 
 type WarehouseOverviewResponse = {
   lowStock: number;
@@ -64,11 +72,75 @@ type CompletedLineRow = {
   transferStatus: "PENDING" | "PROCESSED";
   inventoryStatus: InventoryStatusValue;
   createdAt: string;
+  category: string | null;
 };
 
 type CompletedLinesResponse = {
   count: number;
   rows: CompletedLineRow[];
+};
+
+type InventoryRecordRow = {
+  id: string;
+  category: string;
+  itemCode: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  store: string;
+  receivedAt: string;
+  minQty: number;
+};
+
+const INVENTORY_STORAGE_KEY = "warehouse/inventory-records";
+
+const formatCategoryLabel = (raw: string | null | undefined): string => {
+  if (!raw) {
+    return "Uncategorized";
+  }
+
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "Uncategorized";
+  }
+
+  const normalized = trimmed
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+
+  return normalized || "Uncategorized";
+};
+
+const sortInventoryRecords = (records: InventoryRecordRow[]) =>
+  records
+    .slice()
+    .sort((a, b) =>
+      a.category.localeCompare(b.category, undefined, { sensitivity: "base" }) ||
+      a.itemCode.localeCompare(b.itemCode, undefined, { sensitivity: "base" }) ||
+      a.description.localeCompare(b.description, undefined, { sensitivity: "base" })
+    );
+
+const isInventoryRecordRow = (value: unknown): value is InventoryRecordRow => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const record = value as Partial<InventoryRecordRow>;
+  return (
+    typeof record.id === "string" &&
+    typeof record.category === "string" &&
+    typeof record.itemCode === "string" &&
+    typeof record.description === "string" &&
+    typeof record.quantity === "number" &&
+    typeof record.unit === "string" &&
+    typeof record.store === "string" &&
+    typeof record.receivedAt === "string" &&
+    typeof record.minQty === "number"
+  );
 };
 
 const jsonFetcher = async <T,>(url: string): Promise<T> => {
@@ -142,9 +214,11 @@ const INVENTORY_QUICK_FILTERS = [
 
 type InventoryQuickFilter = (typeof INVENTORY_QUICK_FILTERS)[number];
 
-const MOVEMENT_SEGMENTS = ["All", "Inbound", "Outbound", "Transfer"] as const;
-
-type MovementSegment = (typeof MOVEMENT_SEGMENTS)[number];
+const STORE_OPTIONS = [
+  "Main Warehouse",
+  "Secondary Warehouse",
+  "Spare Parts Store",
+] as const;
 
 const INVENTORY_TABLE_COLUMNS = [
   "PIC",
@@ -154,19 +228,8 @@ const INVENTORY_TABLE_COLUMNS = [
   "QUANTITY",
   "UNIT",
   "STORE",
+  "MIN QTY",
   "ACTIONS",
-] as const;
-
-const MOVEMENTS_TABLE_COLUMNS = [
-  "DATE",
-  "ITEM",
-  "SOURCE",
-  "DESTINATION",
-  "STORE",
-  "TYPE",
-  "QTY",
-  "VALUE",
-  "ORDER",
 ] as const;
 
 const hasPositiveValues = (values: number[]) =>
@@ -176,11 +239,63 @@ export default function WarehousePage() {
   const [inventoryFilter, setInventoryFilter] =
     useState<InventoryQuickFilter>("All");
   const [inventorySearch, setInventorySearch] = useState("");
-  const [movementSearch, setMovementSearch] = useState("");
-  const [movementSegment, setMovementSegment] =
-    useState<MovementSegment>("All");
-  const [storeFilter, setStoreFilter] = useState<string>("");
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [inventoryRecords, setInventoryRecords] = useState<InventoryRecordRow[]>([]);
+  const [inventoryHydrated, setInventoryHydrated] = useState(false);
+  const [receiveTarget, setReceiveTarget] = useState<CompletedLineRow | null>(null);
+  const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [receiveQty, setReceiveQty] = useState<string>("");
+  const [receiveStore, setReceiveStore] = useState<string>(STORE_OPTIONS[0]);
+  const [receiveError, setReceiveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const storedValue = window.localStorage.getItem(INVENTORY_STORAGE_KEY);
+      if (!storedValue) {
+        setInventoryHydrated(true);
+        return;
+      }
+
+      const parsed = JSON.parse(storedValue);
+      if (!Array.isArray(parsed)) {
+        setInventoryHydrated(true);
+        return;
+      }
+
+      const validRecords = parsed
+        .filter(isInventoryRecordRow)
+        .map((record) => ({
+          ...record,
+          category: formatCategoryLabel(record.category),
+        }));
+
+      if (validRecords.length > 0) {
+        setInventoryRecords(sortInventoryRecords(validRecords));
+      }
+    } catch (error) {
+      console.error("warehouse inventory storage parse", error);
+    } finally {
+      setInventoryHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!inventoryHydrated || typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        INVENTORY_STORAGE_KEY,
+        JSON.stringify(inventoryRecords)
+      );
+    } catch (error) {
+      console.error("warehouse inventory storage persist", error);
+    }
+  }, [inventoryHydrated, inventoryRecords]);
 
   const chartState = useChartReady();
 
@@ -202,12 +317,126 @@ export default function WarehousePage() {
     jsonFetcher
   );
 
+  const { rows: materialsRows } = useMaterials({ page: 1, pageSize: 1000 });
+  const materialsByCode = useMemo(() => {
+    const map = new Map<string, { code: string; category: string; minQty: number; unit: string }>();
+    materialsRows.forEach((material) => {
+      if (!material.code) return;
+      const key = material.code.trim().toUpperCase();
+      map.set(key, {
+        code: material.code,
+        category: material.category,
+        minQty: Number(material.minQty ?? 0),
+        unit: material.unit,
+      });
+    });
+    return map;
+  }, [materialsRows]);
+
   const pendingLinesCount = completedLinesData?.count ?? 0;
   const completedLinesRows = completedLinesData?.rows ?? [];
   const hasCompletedLines = completedLinesRows.length > 0;
   const pendingLinesDisplay = completedLinesLoading
     ? "…"
     : numberFormatter.format(pendingLinesCount);
+
+  const defaultLowStockThreshold = 10;
+
+  const filteredInventoryRecords = useMemo(() => {
+    const normalizedSearch = inventorySearch.trim().toLowerCase();
+
+    return inventoryRecords.filter((record) => {
+      const matchesSearch = normalizedSearch
+        ? record.itemCode.toLowerCase().includes(normalizedSearch) ||
+          record.description.toLowerCase().includes(normalizedSearch) ||
+          record.category.toLowerCase().includes(normalizedSearch)
+        : true;
+
+      const threshold = record.minQty > 0 ? record.minQty : defaultLowStockThreshold;
+
+      let matchesFilter = true;
+
+      switch (inventoryFilter) {
+        case "In Stock":
+          matchesFilter = record.quantity > threshold;
+          break;
+        case "Low Stock":
+          matchesFilter = record.quantity > 0 && record.quantity <= threshold;
+          break;
+        case "Out of Stock":
+          matchesFilter = record.quantity <= 0;
+          break;
+        case "All":
+          matchesFilter = true;
+          break;
+        default:
+          matchesFilter = record.category
+            .toLowerCase()
+            .includes(inventoryFilter.toLowerCase());
+      }
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [inventoryRecords, inventoryFilter, inventorySearch, defaultLowStockThreshold]);
+
+  const handleOpenReceive = (row: CompletedLineRow) => {
+    setReceiveTarget(row);
+    setReceiveQty(row.qty);
+    setReceiveStore(STORE_OPTIONS[0]);
+    setReceiveError(null);
+    setReceiveDialogOpen(true);
+  };
+
+  const handleCloseReceive = () => {
+    setReceiveDialogOpen(false);
+    setReceiveTarget(null);
+    setReceiveError(null);
+  };
+
+  const handleReceiveSubmit = () => {
+    if (!receiveTarget) {
+      return;
+    }
+
+    const quantity = Number(receiveQty);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setReceiveError("Enter a valid quantity greater than zero.");
+      return;
+    }
+
+    const store = receiveStore.trim() || STORE_OPTIONS[0];
+    const materialKey = (receiveTarget.materialCode ?? "").trim().toUpperCase();
+    const materialInfo = materialKey ? materialsByCode.get(materialKey) : undefined;
+
+    const category = formatCategoryLabel(
+      materialInfo?.category ?? receiveTarget.category ?? "Uncategorized"
+    );
+    const itemCode = (materialInfo?.code ?? receiveTarget.materialCode ?? "—")
+      .toString()
+      .trim()
+      .toUpperCase();
+    const minQty = materialInfo?.minQty ?? 0;
+    const unit = materialInfo?.unit ?? receiveTarget.unit;
+
+    const record: InventoryRecordRow = {
+      id: crypto.randomUUID(),
+      category,
+      itemCode,
+      description: receiveTarget.itemName,
+      quantity,
+      unit,
+      store,
+      receivedAt: new Date().toISOString(),
+      minQty,
+    };
+
+    setInventoryRecords((prev) => sortInventoryRecords([record, ...prev]));
+    handleCloseReceive();
+  };
+
+  const handleRemoveInventoryRecord = (id: string) => {
+    setInventoryRecords((prev) => prev.filter((record) => record.id !== id));
+  };
 
   const renderChartContent = (
     hasData: boolean,
@@ -464,23 +693,12 @@ export default function WarehousePage() {
   ] as const;
 
   return (
-    <>
-      <section className="tw-mt-6">
+    <div className="tw-mt-8 tw-mb-4 tw-space-y-6">
+      <section>
         <WarehouseHero />
       </section>
 
-      <section className="tw-mt-12 tw-space-y-6">
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <Typography variant="h5" color="blue-gray">
-            Inventory Overview
-          </Typography>
-          <Typography
-            variant="small"
-            className="!tw-font-normal !tw-text-blue-gray-500"
-          >
-            Real-time health of stock levels
-          </Typography>
-        </div>
+      <section className="tw-space-y-6">
         <div className="tw-grid tw-grid-cols-1 tw-gap-6 md:tw-grid-cols-2 xl:tw-grid-cols-4">
           {inventoryOverviewCards.map((card) => (
             <BlackBoxKpiCard
@@ -563,19 +781,23 @@ export default function WarehousePage() {
         </div>
       </section>
 
-      <section className="tw-mt-12 tw-space-y-6">
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <Typography variant="h5" color="blue-gray">
-            Completed Orders Transfer
-          </Typography>
-          <Typography
-            variant="small"
-            className="!tw-font-normal !tw-text-blue-gray-500"
-          >
-            Review completed purchase order lines before they hit inventory
-          </Typography>
-        </div>
+      <section className="tw-space-y-6">
         <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm">
+          <CardHeader
+            floated={false}
+            shadow={false}
+            className="tw-flex tw-flex-col tw-gap-1"
+          >
+            <Typography variant="h6" color="blue-gray">
+              Completed Orders Transfer
+            </Typography>
+            <Typography
+              variant="small"
+              className="!tw-font-normal !tw-text-blue-gray-500"
+            >
+              Review completed purchase order lines before they hit inventory
+            </Typography>
+          </CardHeader>
           <CardBody className="tw-space-y-6">
             <div className="tw-flex tw-items-center tw-gap-3">
               <InboxArrowDownIcon className="tw-h-6 tw-w-6 tw-text-blue-gray-400" />
@@ -622,7 +844,16 @@ export default function WarehousePage() {
                           color="blue-gray"
                           className="tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
                         >
-                          Item
+                          Item Code
+                        </Typography>
+                      </th>
+                      <th className="tw-px-6 tw-py-3 tw-text-left">
+                        <Typography
+                          variant="small"
+                          color="blue-gray"
+                          className="tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
+                        >
+                          Item Name
                         </Typography>
                       </th>
                       <th className="tw-px-6 tw-py-3 tw-text-right">
@@ -658,15 +889,6 @@ export default function WarehousePage() {
                           color="blue-gray"
                           className="tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
                         >
-                          Priority
-                        </Typography>
-                      </th>
-                      <th className="tw-px-6 tw-py-3 tw-text-center">
-                        <Typography
-                          variant="small"
-                          color="blue-gray"
-                          className="tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
-                        >
                           Inventory Flag
                         </Typography>
                       </th>
@@ -692,17 +914,21 @@ export default function WarehousePage() {
                           </div>
                         </td>
                         <td className="tw-px-6 tw-py-4">
-                          <div className="tw-flex tw-flex-col">
-                            <Typography variant="small" color="blue-gray" className="!tw-font-semibold">
-                              {row.itemName}
-                            </Typography>
-                            <Typography
-                              variant="small"
-                              className="!tw-font-normal !tw-text-blue-gray-400"
-                            >
-                              {row.materialCode ?? "—"}
-                            </Typography>
-                          </div>
+                          <Typography
+                            variant="small"
+                            className="!tw-font-medium !tw-text-blue-gray-700"
+                          >
+                            {row.materialCode ?? "—"}
+                          </Typography>
+                        </td>
+                        <td className="tw-px-6 tw-py-4">
+                          <Typography
+                            variant="small"
+                            color="blue-gray"
+                            className="!tw-font-semibold"
+                          >
+                            {row.itemName}
+                          </Typography>
                         </td>
                         <td className="tw-px-6 tw-py-4 tw-text-right">
                           <Typography
@@ -731,20 +957,25 @@ export default function WarehousePage() {
                           </Typography>
                         </td>
                         <td className="tw-px-6 tw-py-4 tw-text-center">
-                          <Chip
-                            value={row.requestPriority}
-                            color={priorityColorMap[row.requestPriority]}
-                            variant="ghost"
-                            className="tw-w-fit tw-uppercase"
-                          />
-                        </td>
-                        <td className="tw-px-6 tw-py-4 tw-text-center">
-                          <Chip
-                            value={inventoryStatusLabel[row.inventoryStatus]}
-                            color={inventoryStatusColor[row.inventoryStatus]}
-                            variant="ghost"
-                            className="tw-w-fit tw-uppercase"
-                          />
+                          <div className="tw-flex tw-items-center tw-justify-center tw-gap-2">
+                            <Chip
+                              value={inventoryStatusLabel[row.inventoryStatus]}
+                              color={inventoryStatusColor[row.inventoryStatus]}
+                              variant="ghost"
+                              className="tw-w-fit tw-uppercase"
+                            />
+                            <Tooltip content="Receive to inventory">
+                              <span>
+                                <IconButton
+                                  variant="text"
+                                  color="blue"
+                                  onClick={() => handleOpenReceive(row)}
+                                >
+                                  <ArrowDownTrayIcon className="tw-h-5 tw-w-5" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -765,18 +996,7 @@ export default function WarehousePage() {
         </Card>
       </section>
 
-      <section className="tw-mt-12 tw-space-y-6">
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <Typography variant="h5" color="blue-gray">
-            Inventory
-          </Typography>
-          <Typography
-            variant="small"
-            className="!tw-font-normal !tw-text-blue-gray-500"
-          >
-            Sortable, filterable, and exportable
-          </Typography>
-        </div>
+      <section className="tw-space-y-6">
         <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm">
           <CardHeader
             floated={false}
@@ -855,126 +1075,111 @@ export default function WarehousePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td
-                      className="tw-px-6 tw-py-10 tw-text-center"
-                      colSpan={INVENTORY_TABLE_COLUMNS.length}
-                    >
-                      <Typography
-                        variant="small"
-                        className="!tw-font-normal !tw-text-blue-gray-400"
+                  {filteredInventoryRecords.length === 0 ? (
+                    <tr>
+                      <td
+                        className="tw-px-6 tw-py-10 tw-text-center"
+                        colSpan={INVENTORY_TABLE_COLUMNS.length}
                       >
-                        Inventory rows will appear once data is connected.
-                      </Typography>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </CardBody>
-        </Card>
-      </section>
-
-      <section className="tw-mt-12 tw-space-y-6">
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <Typography variant="h5" color="blue-gray">
-            Recent Movements
-          </Typography>
-          <Typography
-            variant="small"
-            className="!tw-font-normal !tw-text-blue-gray-500"
-          >
-            Inbound, outbound, and transfer records
-          </Typography>
-        </div>
-        <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm">
-          <CardHeader
-            floated={false}
-            shadow={false}
-            className="tw-flex tw-flex-col tw-gap-6"
-          >
-            <div className="tw-flex tw-flex-col tw-gap-4 lg:tw-flex-row lg:tw-items-center lg:tw-justify-between">
-              <Input
-                value={movementSearch}
-                onChange={(event) => setMovementSearch(event.target.value)}
-                label="Search movements"
-                type="search"
-                icon={<MagnifyingGlassIcon className="tw-h-5 tw-w-5" />}
-                className="lg:tw-w-72"
-                crossOrigin="anonymous"
-              />
-              <div className="tw-flex tw-flex-wrap tw-gap-2">
-                {MOVEMENT_SEGMENTS.map((segment) => (
-                  <Button
-                    key={segment}
-                    size="sm"
-                    variant={movementSegment === segment ? "filled" : "text"}
-                    color={movementSegment === segment ? "blue" : "blue-gray"}
-                    className="tw-capitalize"
-                    onClick={() => setMovementSegment(segment)}
-                  >
-                    {segment}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="tw-flex tw-flex-col tw-gap-3 sm:tw-flex-row sm:tw-items-center sm:tw-gap-4">
-              <Select
-                label="Store"
-                variant="outlined"
-                value={storeFilter || undefined}
-                onChange={(value) => setStoreFilter(value ?? "")}
-                disabled
-                className="sm:tw-w-64"
-              >
-                <Option value="">All stores</Option>
-              </Select>
-              <Select
-                label="Sort"
-                variant="outlined"
-                value={sortOrder}
-                onChange={(value) =>
-                  setSortOrder((value as "newest" | "oldest") ?? "newest")
-                }
-                className="sm:tw-w-64"
-              >
-                <Option value="newest">Newest → Oldest</Option>
-                <Option value="oldest">Oldest → Newest</Option>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardBody className="tw-space-y-6 tw-p-0">
-            <div className="tw-overflow-x-auto">
-              <table className="tw-w-full tw-min-w-[880px] tw-table-auto">
-                <thead className="tw-bg-blue-gray-50/60">
-                  <tr>
-                    {MOVEMENTS_TABLE_COLUMNS.map((column) => (
-                      <th key={column} className="tw-px-6 tw-py-3 tw-text-left">
                         <Typography
                           variant="small"
-                          color="blue-gray"
-                          className="tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
+                          className="!tw-font-normal !tw-text-blue-gray-400"
                         >
-                          {column}
+                          {inventoryRecords.length === 0
+                            ? "Inventory rows will appear after receiving items."
+                            : "No records match the current filters."}
                         </Typography>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      className="tw-px-6 tw-py-10 tw-text-center"
-                      colSpan={MOVEMENTS_TABLE_COLUMNS.length}
-                    >
-                      <Typography
-                        variant="small"
-                        className="!tw-font-normal !tw-text-blue-gray-400"
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredInventoryRecords.map((record) => (
+                      <tr
+                        key={record.id}
+                        className="tw-border-b tw-border-blue-gray-50 last:tw-border-transparent"
                       >
-                        Movement history will populate after connecting /api/inventory/movements.
-                      </Typography>
-                    </td>
-                  </tr>
+                        <td className="tw-px-6 tw-py-4">
+                          <div className="tw-grid tw-h-10 tw-w-10 tw-place-items-center tw-rounded-full tw-bg-blue-50 tw-text-blue-600">
+                            {record.category.charAt(0).toUpperCase()}
+                          </div>
+                        </td>
+                        <td className="tw-px-6 tw-py-4">
+                          <Typography
+                            variant="small"
+                            className="!tw-font-semibold !tw-text-blue-gray-700"
+                          >
+                            {record.category}
+                          </Typography>
+                          <Typography
+                            variant="small"
+                            className="!tw-font-normal !tw-text-blue-gray-400"
+                          >
+                            Received {new Date(record.receivedAt).toLocaleString()}
+                          </Typography>
+                        </td>
+                        <td className="tw-px-6 tw-py-4">
+                          <Typography
+                            variant="small"
+                            className="!tw-font-medium !tw-text-blue-gray-700"
+                          >
+                            {record.itemCode}
+                          </Typography>
+                        </td>
+                        <td className="tw-px-6 tw-py-4">
+                          <Typography
+                            variant="small"
+                            className="!tw-font-normal !tw-text-blue-gray-500"
+                          >
+                            {record.description}
+                          </Typography>
+                        </td>
+                        <td className="tw-px-6 tw-py-4 tw-text-right">
+                          <Typography
+                            variant="small"
+                            className="!tw-font-semibold !tw-text-blue-gray-700"
+                          >
+                            {qtyFormatter.format(record.quantity)}
+                          </Typography>
+                        </td>
+                        <td className="tw-px-6 tw-py-4 tw-text-center">
+                          <Chip
+                            value={record.unit}
+                            color="blue-gray"
+                            variant="ghost"
+                            className="tw-uppercase"
+                          />
+                        </td>
+                        <td className="tw-px-6 tw-py-4">
+                          <Typography
+                            variant="small"
+                            className="!tw-font-medium !tw-text-blue-gray-700"
+                          >
+                            {record.store}
+                          </Typography>
+                        </td>
+                        <td className="tw-px-6 tw-py-4 tw-text-right">
+                          <Typography
+                            variant="small"
+                            className="!tw-font-normal !tw-text-blue-gray-500"
+                          >
+                            {qtyFormatter.format(record.minQty)}
+                          </Typography>
+                        </td>
+                        <td className="tw-px-6 tw-py-4 tw-text-right">
+                          <Tooltip content="Remove record">
+                            <span>
+                              <IconButton
+                                variant="text"
+                                color="blue-gray"
+                                onClick={() => handleRemoveInventoryRecord(record.id)}
+                              >
+                                <XCircleIcon className="tw-h-5 tw-w-5" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -982,18 +1187,7 @@ export default function WarehousePage() {
         </Card>
       </section>
 
-      <section className="tw-mt-12 tw-space-y-6">
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <Typography variant="h5" color="blue-gray">
-            Inventory Details
-          </Typography>
-          <Typography
-            variant="small"
-            className="!tw-font-normal !tw-text-blue-gray-500"
-          >
-            Explore all SKUs, values, and status
-          </Typography>
-        </div>
+      <section className="tw-space-y-6">
         <div className="tw-grid tw-grid-cols-1 tw-gap-6 md:tw-grid-cols-2 xl:tw-grid-cols-4">
           {inventoryDetailsCards.map((card) => (
             <BlackBoxKpiCard
@@ -1069,18 +1263,7 @@ export default function WarehousePage() {
         </div>
       </section>
 
-      <section className="tw-mt-12 tw-space-y-6">
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <Typography variant="h5" color="blue-gray">
-            Critical Alerts
-          </Typography>
-          <Typography
-            variant="small"
-            className="!tw-font-normal !tw-text-blue-gray-500"
-          >
-            Priority inventory requiring attention
-          </Typography>
-        </div>
+      <section className="tw-space-y-6">
         <div className="tw-grid tw-grid-cols-1 tw-gap-6 md:tw-grid-cols-2 xl:tw-grid-cols-4">
           {criticalAlertCards.map((card) => (
             <BlackBoxKpiCard
@@ -1190,18 +1373,7 @@ export default function WarehousePage() {
         </Card>
       </section>
 
-      <section className="tw-mt-12 tw-space-y-6">
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <Typography variant="h5" color="blue-gray">
-            Slow-Moving & Excess Stock
-          </Typography>
-          <Typography
-            variant="small"
-            className="!tw-font-normal !tw-text-blue-gray-500"
-          >
-            Identify optimisation opportunities
-          </Typography>
-        </div>
+      <section className="tw-space-y-6">
         <div className="tw-grid tw-grid-cols-1 tw-gap-6 md:tw-grid-cols-2 xl:tw-grid-cols-4">
           {slowMovingCards.map((card) => (
             <BlackBoxKpiCard
@@ -1284,18 +1456,7 @@ export default function WarehousePage() {
         </div>
       </section>
 
-      <section className="tw-mt-12 tw-mb-4 tw-space-y-6">
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <Typography variant="h5" color="blue-gray">
-            Warehouse Utilization
-          </Typography>
-          <Typography
-            variant="small"
-            className="!tw-font-normal !tw-text-blue-gray-500"
-          >
-            Capacity and usage by warehouse
-          </Typography>
-        </div>
+      <section className="tw-space-y-6">
         <div className="tw-grid tw-grid-cols-1 tw-gap-6 md:tw-grid-cols-2 xl:tw-grid-cols-4">
           {utilizationCards.map((card) => (
             <BlackBoxKpiCard
@@ -1375,6 +1536,100 @@ export default function WarehousePage() {
           </Card>
         </div>
       </section>
-    </>
+
+      <Dialog open={receiveDialogOpen} handler={handleCloseReceive} size="sm">
+        <DialogHeader>Receive to Inventory</DialogHeader>
+        <DialogBody className="tw-space-y-4">
+          {receiveTarget ? (
+            <div className="tw-space-y-4">
+              <div className="tw-flex tw-flex-col tw-gap-1">
+                <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
+                  Item
+                </Typography>
+                <Typography variant="h6" className="!tw-font-semibold !tw-text-blue-gray-900">
+                  {receiveTarget.itemName}
+                </Typography>
+                <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-400">
+                  PO {receiveTarget.poNo} • Vendor {receiveTarget.vendorName}
+                </Typography>
+              </div>
+              <div className="tw-grid tw-grid-cols-1 tw-gap-3 sm:tw-grid-cols-2">
+                <div>
+                  <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
+                    Category
+                  </Typography>
+                  <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-700">
+                    {receiveTarget.category ?? "Uncategorized"}
+                  </Typography>
+                </div>
+                <div>
+                  <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
+                    Item Code
+                  </Typography>
+                  <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-700">
+                    {receiveTarget.materialCode ?? "—"}
+                  </Typography>
+                </div>
+                <div>
+                  <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
+                    Ordered Qty
+                  </Typography>
+                  <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-700">
+                    {qtyFormatter.format(parseNumeric(receiveTarget.qty))} {receiveTarget.unit}
+                  </Typography>
+                </div>
+                <div>
+                  <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
+                    Priority
+                  </Typography>
+                  <Chip
+                    value={receiveTarget.requestPriority}
+                    color={priorityColorMap[receiveTarget.requestPriority]}
+                    variant="ghost"
+                    className="tw-w-fit tw-uppercase"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {receiveError ? (
+            <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
+              {receiveError}
+            </Typography>
+          ) : null}
+
+          <Input
+            label="Actual quantity received"
+            type="number"
+            value={receiveQty}
+            onChange={(event) => setReceiveQty(event.target.value)}
+            crossOrigin="anonymous"
+            min="0"
+            required
+          />
+
+          <Select
+            label="Store"
+            value={receiveStore}
+            onChange={(value) => setReceiveStore(value ?? STORE_OPTIONS[0])}
+          >
+            {STORE_OPTIONS.map((option) => (
+              <Option key={option} value={option}>
+                {option}
+              </Option>
+            ))}
+          </Select>
+        </DialogBody>
+        <DialogFooter className="tw-space-x-2">
+          <Button variant="text" color="gray" onClick={handleCloseReceive}>
+            Cancel
+          </Button>
+          <Button color="blue" onClick={handleReceiveSubmit} disabled={!receiveTarget}>
+            Receive
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </div>
   );
 }

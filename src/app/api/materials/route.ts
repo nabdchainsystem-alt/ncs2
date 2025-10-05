@@ -10,12 +10,13 @@ const createMaterialSchema = z.object({
   name: z.string().min(1),
   unit: z.enum(["PC", "KG", "L", "Carton", "Pallet"]),
   category: z.string().min(1),
+  minQty: z.coerce.number().min(0),
   warehouseId: z.string().nullable().optional(),
 });
 
 type MaterialPayload = z.infer<typeof createMaterialSchema>;
 
-const sortableFields = new Set(["code", "name", "unit", "category", "createdAt", "updatedAt"]);
+const sortableFields = new Set(["code", "name", "unit", "category", "minQty", "createdAt", "updatedAt"]);
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
     const material = await prisma.material.create({
       data: {
         ...data,
+        minQty: new Prisma.Decimal(data.minQty),
         warehouseId:
           typeof data.warehouseId === "string" && data.warehouseId.length > 0
             ? data.warehouseId

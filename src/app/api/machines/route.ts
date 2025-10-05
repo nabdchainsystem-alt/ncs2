@@ -22,15 +22,25 @@ export async function GET(request: Request) {
   const { page, pageSize, search, sortField, sortDirection } = parsePaginationParams(url);
   const skip = (page - 1) * pageSize;
 
-  const where = search
-    ? {
-        OR: [
-          { name: { contains: search } },
-          { code: { contains: search } },
-          { status: { contains: search } },
-        ],
-      }
-    : undefined;
+  const statusParam = url.searchParams.get("status")?.trim();
+
+  const whereAnd: Prisma.MachineWhereInput[] = [];
+
+  if (search) {
+    whereAnd.push({
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { code: { contains: search, mode: "insensitive" } },
+        { status: { contains: search, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (statusParam && (statusParam === "Active" || statusParam === "Inactive")) {
+    whereAnd.push({ status: statusParam });
+  }
+
+  const where = whereAnd.length ? { AND: whereAnd } : undefined;
 
   const orderBy = sortField && sortableFields.has(sortField)
     ? { [sortField]: sortDirection ?? "asc" }

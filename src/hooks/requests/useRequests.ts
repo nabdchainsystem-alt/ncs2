@@ -10,6 +10,8 @@ export type RequestRow = {
   machineName?: string | null;
   status: "OPEN" | "PENDING" | "CLOSED" | "CANCELLED";
   priority: "Low" | "Normal" | "High" | "Urgent";
+  primaryItemCode: string | null;
+  primaryItemName: string | null;
 };
 
 const STATUS_VALUES = new Set<RequestRow["status"]>(["OPEN", "PENDING", "CLOSED", "CANCELLED"]);
@@ -91,6 +93,8 @@ export function useRequests(params: Params) {
         machineName: row.machine?.name ?? row.machineName ?? null,
         status: statusValue,
         priority: priorityValue,
+        primaryItemCode: typeof row.primaryItemCode === "string" ? row.primaryItemCode : null,
+        primaryItemName: typeof row.primaryItemName === "string" ? row.primaryItemName : null,
       } satisfies RequestRow;
     }).filter((row: RequestRow) => row.id && row.code);
 

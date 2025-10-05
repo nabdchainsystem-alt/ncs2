@@ -2,13 +2,7 @@
 
 import useSWR from "swr";
 
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  Typography,
-  Chip,
-} from "@/components/MaterialTailwind";
+import { Card, CardBody, CardHeader, Typography } from "@/components/MaterialTailwind";
 import { VerticalBarChart } from "@/widgets/charts";
 
 type ResponseData = {
@@ -93,12 +87,9 @@ export default function OrdersByDeptChart() {
                   {total}
                 </Typography>
                 {dominantDept ? (
-                  <Chip
-                    value={`${dominantPct}% ${dominantDept}`}
-                    color="red"
-                    variant="ghost"
-                    className="tw-w-fit tw-text-xs !tw-font-semibold"
-                  />
+                  <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-red-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase tw-text-red-700">
+                    {`${dominantPct}% ${dominantDept.toUpperCase()}`}
+                  </span>
                 ) : null}
               </div>
             </div>

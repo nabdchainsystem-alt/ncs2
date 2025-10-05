@@ -53,7 +53,7 @@ export function useWarehousesOptions() {
 }
 
 export function useMaterialsOptions() {
-  const { rows, isLoading, mutate } = useMaterials({ page: 1, pageSize: 100 });
+  const { rows, isLoading, mutate } = useMaterials({ page: 1, pageSize: 1000 });
   const options = rows.map((row) => ({
     value: row.id,
     label: `${row.code} · ${row.name}`,

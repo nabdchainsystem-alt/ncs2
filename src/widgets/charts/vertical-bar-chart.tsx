@@ -1,10 +1,13 @@
-import React from "react";
+"use client";
 
-// react-apexcharts
-import Chart from "react-apexcharts";
+import React, { useMemo } from "react";
+import dynamic from "next/dynamic";
 
 // deepmerge
 import merge from "deepmerge";
+import { useApexContainer } from "./useApexContainer";
+
+const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 type PropTypes = {
   height?: number;
@@ -20,7 +23,8 @@ export function VerticalBarChart({
   colors,
   options,
 }: PropTypes) {
-  const chartOptions = React.useMemo(
+  const { containerRef, ready, width } = useApexContainer();
+  const chartOptions = useMemo(
     () => ({
       colors,
       ...merge(
@@ -113,12 +117,24 @@ export function VerticalBarChart({
     [height, colors, options]
   );
   return (
-    <Chart
-      height={height}
-      type="bar"
-      series={series}
-      options={chartOptions as any}
-    />
+    <div ref={containerRef} className="tw-w-full">
+      {ready ? (
+        <ReactApexChart
+          height={height}
+          width={width || undefined}
+          type="bar"
+          series={series}
+          options={chartOptions as any}
+        />
+      ) : (
+        <div
+          className="tw-grid tw-w-full tw-place-items-center tw-text-blue-gray-300"
+          style={{ height }}
+        >
+          Loading chart…
+        </div>
+      )}
+    </div>
   );
 }
 

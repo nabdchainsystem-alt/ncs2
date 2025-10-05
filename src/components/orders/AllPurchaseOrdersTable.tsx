@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Button,
@@ -15,10 +15,6 @@ import {
   IconButton,
   Input,
   Option,
-  Menu,
-  MenuHandler,
-  MenuItem,
-  MenuList,
   Select,
   Tooltip,
   Typography,
@@ -53,7 +49,8 @@ const PRIORITY_COLORS: Record<PriorityValue, "blue-gray" | "blue" | "amber" | "r
 
 const TABLE_HEADERS = [
   "PO NO",
-  "RFQ NO",
+  "ITEM CODE",
+  "ITEM NAME",
   "VENDOR",
   "CREATED",
   "PRIORITY",
@@ -72,6 +69,10 @@ type PurchaseOrderParams = {
   sort?: string;
 };
 
+type ReceiveTarget = { id: string; poNo: string };
+type ReceiveDetail = { items: Array<any>; [key: string]: unknown };
+type ReceiveFormState = { qty: string; date: string };
+
 export default function AllPurchaseOrdersTable() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -81,8 +82,101 @@ export default function AllPurchaseOrdersTable() {
   const [updateTarget, setUpdateTarget] = useState<{ id: string; nextStatus: PoStatus } | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [priorityUpdatingId, setPriorityUpdatingId] = useState<string | null>(null);
-  const [priorityError, setPriorityError] = useState<string | null>(null);
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [receiveTarget, setReceiveTarget] = useState<ReceiveTarget | null>(null);
+  const [receiveDetail, setReceiveDetail] = useState<ReceiveDetail | null>(null);
+  const [receiveForm, setReceiveForm] = useState<ReceiveFormState>({
+    qty: "",
+    date: new Date().toISOString().slice(0, 10),
+  });
+  const [receiveDialogError, setReceiveDialogError] = useState<string | null>(null);
+  const [isReceiveSubmitting, setIsReceiveSubmitting] = useState(false);
+  const [isReceiveDetailLoading, setIsReceiveDetailLoading] = useState(false);
+  const [isReceiveDetailError, setIsReceiveDetailError] = useState(false);
+
+  useEffect(() => {
+    if (!receiveOpen) {
+      return;
+    }
+    setReceiveDialogError(null);
+    setReceiveForm((prev) => ({
+      ...prev,
+      date: new Date().toISOString().slice(0, 10),
+    }));
+  }, [receiveOpen, receiveTarget?.id]);
+
+  useEffect(() => {
+    if (!receiveOpen || !receiveTarget?.id) {
+      setReceiveDetail(null);
+      setIsReceiveDetailLoading(false);
+      setIsReceiveDetailError(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const controller = new AbortController();
+
+    const fetchReceiveDetail = async () => {
+      try {
+        setIsReceiveDetailLoading(true);
+        setIsReceiveDetailError(false);
+        const response = await fetch(`/api/purchase-orders/${receiveTarget.id}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load purchase order detail");
+        }
+
+        const payload = (await response.json()) as ReceiveDetail;
+        if (!isCancelled) {
+          setReceiveDetail(payload);
+        }
+      } catch (err) {
+        if (isCancelled || (err instanceof DOMException && err.name === "AbortError")) {
+          return;
+        }
+        console.error("GET /api/purchase-orders/[id]", err);
+        setIsReceiveDetailError(true);
+        setReceiveDetail(null);
+      } finally {
+        if (!isCancelled) {
+          setIsReceiveDetailLoading(false);
+        }
+      }
+    };
+
+    fetchReceiveDetail();
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
+  }, [receiveOpen, receiveTarget?.id]);
+
+  useEffect(() => {
+    if (!receiveOpen) {
+      return;
+    }
+    if (!receiveDetail?.items?.length) {
+      return;
+    }
+
+    const totalQty = receiveDetail.items.reduce((sum, item) => {
+      const numeric = Number(item?.qty ?? 0);
+      return Number.isFinite(numeric) ? sum + numeric : sum;
+    }, 0);
+
+    setReceiveForm((prev) => {
+      if (prev.qty) {
+        return prev;
+      }
+      return {
+        ...prev,
+        qty: totalQty > 0 ? String(Number(totalQty.toFixed(4))) : "",
+      };
+    });
+  }, [receiveOpen, receiveDetail]);
 
   const params = useMemo<PurchaseOrderParams>(
     () => ({
@@ -129,6 +223,27 @@ export default function AllPurchaseOrdersTable() {
     }
   };
 
+  const onOpenReceive = (poId: string, poNo: string) => {
+    setUpdateTarget(null);
+    setReceiveTarget({ id: poId, poNo });
+    setReceiveDetail(null);
+    setIsReceiveDetailError(false);
+    setIsReceiveDetailLoading(false);
+    setReceiveForm({ qty: "", date: new Date().toISOString().slice(0, 10) });
+    setReceiveDialogError(null);
+    setReceiveOpen(true);
+  };
+
+  const onCloseReceive = () => {
+    setReceiveOpen(false);
+    setReceiveTarget(null);
+    setReceiveDetail(null);
+    setIsReceiveDetailError(false);
+    setIsReceiveDetailLoading(false);
+    setReceiveDialogError(null);
+    setReceiveForm({ qty: "", date: new Date().toISOString().slice(0, 10) });
+  };
+
   const renderStatusChip = (status: PoStatus) => (
     <Chip
       value={status}
@@ -137,35 +252,6 @@ export default function AllPurchaseOrdersTable() {
       className="tw-uppercase"
     />
   );
-
-  const handlePriorityUpdate = async (id: string, currentPriority: PriorityValue, nextPriority: PriorityValue) => {
-    if (currentPriority === nextPriority) {
-      return;
-    }
-
-    try {
-      setPriorityUpdatingId(id);
-      setPriorityError(null);
-      const response = await fetch(`/api/purchase-orders/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priority: nextPriority }),
-      });
-
-      if (!response.ok) {
-        const message = await response.text();
-        setPriorityError(message || "Unable to update priority");
-        return;
-      }
-
-      await mutate();
-    } catch (error) {
-      console.error("PATCH /api/purchase-orders/:id priority", error);
-      setPriorityError("Unexpected error while updating priority");
-    } finally {
-      setPriorityUpdatingId(null);
-    }
-  };
 
   const renderBody = () => {
     const columnCount = TABLE_HEADERS.length;
@@ -207,90 +293,73 @@ export default function AllPurchaseOrdersTable() {
       );
     }
 
-    return rows.map((row) => (
-      <tr key={row.id} className="tw-border-t tw-border-blue-gray-50">
-        <td className="tw-px-6 tw-py-4 tw-font-semibold tw-text-blue-gray-600">{row.poNo}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{row.quotationNo}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{row.vendorName}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{formatDate(row.createdAt)}</td>
-        <td className="tw-px-6 tw-py-4">
-          <div className="tw-flex tw-items-center tw-gap-2">
+    return rows.map((row) => {
+      const itemCode = row.primaryItemCode ?? "—";
+      const itemName = row.primaryItemName ?? "—";
+
+      return (
+        <tr key={row.id} className="tw-border-t tw-border-blue-gray-50">
+          <td className="tw-px-6 tw-py-4 tw-text-center tw-font-semibold tw-text-blue-gray-600">
+            {row.poNo}
+          </td>
+          <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{itemCode}</td>
+          <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-600">{itemName}</td>
+          <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.vendorName}</td>
+          <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{formatDate(row.createdAt)}</td>
+          <td className="tw-px-6 tw-py-4 tw-text-center">
             <Chip
               value={row.priority}
               color={PRIORITY_COLORS[row.priority as PriorityValue] ?? "blue-gray"}
               variant="ghost"
               className="tw-uppercase"
             />
-            <Menu placement="bottom-start">
-              <MenuHandler>
-                <Button
-                  size="sm"
-                  variant="text"
-                  color="blue-gray"
-                  disabled={priorityUpdatingId === row.id}
-                >
-                  Change
-                </Button>
-              </MenuHandler>
-              <MenuList>
-                {PRIORITY_OPTIONS.map((option) => (
-                  <MenuItem
-                    key={option}
-                    onClick={() => handlePriorityUpdate(row.id, row.priority as PriorityValue, option)}
-                    disabled={priorityUpdatingId === row.id}
+          </td>
+          <td className="tw-px-6 tw-py-4 tw-text-center">{renderStatusChip(row.status)}</td>
+          <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{formatSAR(row.subtotal)}</td>
+          <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{formatSAR(row.vatAmount)}</td>
+          <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{formatSAR(row.total)}</td>
+          <td className="tw-px-6 tw-py-4 tw-text-center">
+            <div className="tw-flex tw-items-center tw-justify-center tw-gap-2">
+              <Tooltip content="View details">
+                <span>
+                  <IconButton
+                    variant="text"
+                    color="blue-gray"
+                    onClick={() => setViewId(row.id)}
                   >
-                    {option}
-                  </MenuItem>
-                ))}
-              </MenuList>
-            </Menu>
-          </div>
-        </td>
-        <td className="tw-px-6 tw-py-4">{renderStatusChip(row.status)}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{formatSAR(row.subtotal)}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{formatSAR(row.vatAmount)}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{formatSAR(row.total)}</td>
-        <td className="tw-px-6 tw-py-4">
-          <div className="tw-flex tw-items-center tw-gap-2">
-            <Tooltip content="View details">
-              <span>
-                <IconButton
-                  variant="text"
-                  color="blue-gray"
-                  onClick={() => setViewId(row.id)}
-                >
-                  <EyeIcon className="tw-h-4 tw-w-4" />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip content="Mark received">
-              <span>
-                <IconButton
-                  variant="text"
-                  color="green"
-                  onClick={() => setUpdateTarget({ id: row.id, nextStatus: "RECEIVED" })}
-                  disabled={row.status === "RECEIVED" || row.status === "CLOSED"}
-                >
-                  <InboxArrowDownIcon className="tw-h-4 tw-w-4" />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip content="Close order">
-              <span>
-                <IconButton
-                  variant="text"
-                  color="blue-gray"
-                  onClick={() => setUpdateTarget({ id: row.id, nextStatus: "CLOSED" })}
-                  disabled={row.status === "CLOSED"}
-                >
-                  <CheckCircleIcon className="tw-h-4 tw-w-4" />
-                </IconButton>
-              </span>
-            </Tooltip>
-          </div>
-        </td>
-      </tr>
-    ));
+                    <EyeIcon className="tw-h-4 tw-w-4" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip content="Mark received">
+                <span>
+                  <IconButton
+                    variant="text"
+                    color="green"
+                    onClick={() => onOpenReceive(row.id, row.poNo)}
+                    disabled={row.status === "RECEIVED" || row.status === "CLOSED"}
+                  >
+                    <InboxArrowDownIcon className="tw-h-4 tw-w-4" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip content="Close order">
+                <span>
+                  <IconButton
+                    variant="text"
+                    color="blue-gray"
+                    onClick={() => setUpdateTarget({ id: row.id, nextStatus: "CLOSED" })}
+                    disabled={row.status === "CLOSED"}
+                  >
+                    <CheckCircleIcon className="tw-h-4 tw-w-4" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </div>
+          </td>
+        </tr>
+      );
+    });
   };
 
   return (
@@ -344,11 +413,11 @@ export default function AllPurchaseOrdersTable() {
           </div>
         </CardHeader>
         <CardBody className="tw-overflow-x-auto tw-p-0">
-          <table className="tw-min-w-max tw-w-full tw-table-auto">
-            <thead>
+          <table className="tw-min-w-max tw-w-full tw-table-auto tw-text-center">
+            <thead className="tw-bg-blue-gray-50/60">
               <tr>
                 {TABLE_HEADERS.map((header) => (
-                  <th key={header} className="tw-px-6 tw-py-4">
+                  <th key={header} className="tw-px-6 tw-py-4 tw-text-center">
                     <Typography
                       variant="small"
                       color="blue-gray"
@@ -363,13 +432,6 @@ export default function AllPurchaseOrdersTable() {
             <tbody>{renderBody()}</tbody>
           </table>
         </CardBody>
-        {priorityError ? (
-          <div className="tw-px-6 tw-py-2">
-            <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
-              {priorityError}
-            </Typography>
-          </div>
-        ) : null}
         <div className="tw-flex tw-items-center tw-justify-between tw-gap-4 tw-px-6 tw-py-4">
           <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
             Page {currentPage} of {totalPages}
@@ -443,6 +505,121 @@ export default function AllPurchaseOrdersTable() {
             disabled={isUpdating || !updateTarget}
           >
             {isUpdating ? "Updating..." : "Confirm"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      <Dialog open={receiveOpen} handler={onCloseReceive} size="sm">
+        <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
+          <Typography variant="h5" color="blue-gray">
+            Mark Purchase Order Received
+          </Typography>
+          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+            Confirm the quantity received and the receipt date.
+          </Typography>
+        </DialogHeader>
+        <DialogBody className="tw-space-y-4">
+          {receiveTarget ? (
+            <div className="tw-flex tw-flex-col tw-gap-1">
+              <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
+                Purchase Order
+              </Typography>
+              <Typography variant="h6" className="!tw-font-semibold !tw-text-blue-gray-900">
+                {receiveTarget.poNo}
+              </Typography>
+            </div>
+          ) : null}
+
+          {isReceiveDetailLoading ? (
+            <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-400">
+              Loading purchase order details…
+            </Typography>
+          ) : isReceiveDetailError ? (
+            <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
+              Unable to fetch purchase order items. Quantity defaults may be inaccurate.
+            </Typography>
+          ) : null}
+
+          <Input
+            type="number"
+            label="Quantity received"
+            value={receiveForm.qty}
+            min="0"
+            step="0.01"
+            onChange={(event) =>
+              setReceiveForm((prev) => ({ ...prev, qty: event.target.value }))
+            }
+            crossOrigin="anonymous"
+          />
+
+          <Input
+            type="date"
+            label="Received date"
+            value={receiveForm.date}
+            onChange={(event) =>
+              setReceiveForm((prev) => ({ ...prev, date: event.target.value }))
+            }
+          />
+
+          {receiveDialogError ? (
+            <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
+              {receiveDialogError}
+            </Typography>
+          ) : null}
+        </DialogBody>
+        <DialogFooter className="tw-space-x-2">
+          <Button
+            variant="text"
+            color="gray"
+            onClick={onCloseReceive}
+            disabled={isReceiveSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            color="blue"
+            onClick={async () => {
+              if (!receiveTarget) return;
+              const qtyValue = Number(receiveForm.qty);
+              if (!Number.isFinite(qtyValue) || qtyValue <= 0) {
+                setReceiveDialogError("Enter a valid quantity greater than zero.");
+                return;
+              }
+              const dateValue = receiveForm.date
+                ? new Date(`${receiveForm.date}T00:00:00`)
+                : new Date();
+
+              try {
+                setIsReceiveSubmitting(true);
+                setReceiveDialogError(null);
+                const response = await fetch(`/api/purchase-orders/${receiveTarget.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    status: "RECEIVED",
+                    receivedQty: qtyValue,
+                    receivedAt: dateValue.toISOString(),
+                  }),
+                });
+
+                if (!response.ok) {
+                  const payload = await response.json().catch(() => ({}));
+                  setReceiveDialogError(payload.message ?? "Unable to mark as received");
+                  return;
+                }
+
+                onCloseReceive();
+                await mutate();
+              } catch (err) {
+                console.error("PATCH /api/purchase-orders/[id] received", err);
+                setReceiveDialogError("Unexpected error while marking the order received.");
+              } finally {
+                setIsReceiveSubmitting(false);
+              }
+            }}
+            disabled={isReceiveSubmitting || !receiveTarget}
+          >
+            {isReceiveSubmitting ? "Saving..." : "Confirm"}
           </Button>
         </DialogFooter>
       </Dialog>

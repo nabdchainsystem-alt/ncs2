@@ -1,11 +1,12 @@
 "use client";
-import React from "react";
-
-// react-apexcharts
-import Chart from "react-apexcharts";
+import React, { useMemo } from "react";
+import dynamic from "next/dynamic";
 
 // deepmerge
 import merge from "deepmerge";
+import { useApexContainer } from "./useApexContainer";
+
+const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 type PropTypes = {
   height?: number;
@@ -20,7 +21,8 @@ export function LineChart({
   colors,
   options,
 }: PropTypes) {
-  const chartOptions = React.useMemo(
+  const { containerRef, ready, width } = useApexContainer();
+  const chartOptions = useMemo(
     () => ({
       colors,
       ...merge(
@@ -107,12 +109,24 @@ export function LineChart({
   );
 
   return (
-    <Chart
-      type="line"
-      height={height}
-      series={series}
-      options={chartOptions as any}
-    />
+    <div ref={containerRef} className="tw-w-full">
+      {ready ? (
+        <ReactApexChart
+          type="line"
+          height={height}
+          width={width || undefined}
+          series={series}
+          options={chartOptions as any}
+        />
+      ) : (
+        <div
+          className="tw-grid tw-w-full tw-place-items-center tw-text-blue-gray-300"
+          style={{ height }}
+        >
+          Loading chart…
+        </div>
+      )}
+    </div>
   );
 }
 

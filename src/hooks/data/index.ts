@@ -1,22 +1,50 @@
 import { usePaged } from "./usePaged";
 
-export function useDepartments(params: { page: number; pageSize: number; search?: string; sort?: string }) {
+export function useDepartments(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  sort?: string;
+}) {
   return usePaged<DepartmentDto>("/api/departments", params);
 }
 
-export function useWarehouses(params: { page: number; pageSize: number; search?: string; sort?: string }) {
+export function useWarehouses(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  sort?: string;
+}) {
   return usePaged<WarehouseDto>("/api/warehouses", params);
 }
 
-export function useMaterials(params: { page: number; pageSize: number; search?: string; sort?: string }) {
+export function useMaterials(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  sort?: string;
+}) {
   return usePaged<MaterialDto>("/api/materials", params);
 }
 
-export function useVendors(params: { page: number; pageSize: number; search?: string; sort?: string }) {
+export function useVendors(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  sort?: string;
+  status?: string;
+  category?: string;
+}) {
   return usePaged<VendorDto>("/api/vendors", params);
 }
 
-export function useMachines(params: { page: number; pageSize: number; search?: string; sort?: string }) {
+export function useMachines(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  sort?: string;
+  status?: string;
+}) {
   return usePaged<MachineDto>("/api/machines", params);
 }
 
@@ -45,6 +73,7 @@ export type MaterialDto = {
   name: string;
   unit: string;
   category: string;
+  minQty: string;
   warehouseId: string | null;
   warehouse?: { id: string; name: string | null } | null;
   createdAt: string;

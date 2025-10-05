@@ -17,6 +17,8 @@ const updateSchema = z
   .object({
     status: z.nativeEnum(POStatus).optional(),
     priority: z.nativeEnum(Priority).optional(),
+    receivedAt: z.string().datetime().optional(),
+    receivedQty: z.coerce.number().positive().optional(),
   })
   .refine((value) => value.status !== undefined || value.priority !== undefined, {
     message: "At least one field (status or priority) is required",
@@ -87,6 +89,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { id } = paramsSchema.parse(await context.params);
     const payload = await request.json();
     const data = updateSchema.parse(payload);
+    const { status, priority, receivedAt, receivedQty } = data;
 
     const existing = await prisma.purchaseOrder.findUnique({
       where: { id },
@@ -106,14 +109,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
 
     const updateData: Prisma.PurchaseOrderUpdateInput = {};
-    if (data.status !== undefined) {
-      updateData.status = data.status;
+    if (status !== undefined) {
+      updateData.status = status;
     }
-    if (data.priority !== undefined) {
-      updateData.priority = data.priority;
+    if (priority !== undefined) {
+      updateData.priority = priority;
     }
 
-    const priorityForInventory = data.priority ?? existing.priority;
+    const priorityForInventory = priority ?? existing.priority;
+    const receivedAtDate = receivedAt ? new Date(receivedAt) : undefined;
+    const receivedQtyDecimal = receivedQty !== undefined ? new Prisma.Decimal(receivedQty) : undefined;
 
     const updated = await prisma
       .$transaction(async (tx) => {
@@ -123,10 +128,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           select: { id: true, status: true },
         });
 
-        if (
-          data.status === POStatus.RECEIVED &&
-          existing.status !== POStatus.RECEIVED
-        ) {
+        if (status === POStatus.RECEIVED && existing.status !== POStatus.RECEIVED) {
           const existingTransfers = await tx.completedOrderTransfer.findMany({
             where: { poId: id },
             select: { poItemId: true },
@@ -139,9 +141,33 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
             existing.rfq.request?.priority ?? priorityForInventory
           );
 
-          const transfersToCreate = existing.items
-            .filter((item) => !existingItemIds.has(item.id))
-            .map((item) => ({
+          const itemsToTransfer = existing.items.filter((item) => !existingItemIds.has(item.id));
+
+          let quantityMap: Map<string, Prisma.Decimal> | null = null;
+          if (receivedQtyDecimal && itemsToTransfer.length > 0) {
+            const totalOrdered = itemsToTransfer.reduce(
+              (sum, item) => sum.add(item.qty),
+              new Prisma.Decimal(0)
+            );
+
+            if (totalOrdered.gt(0)) {
+              const ratio = receivedQtyDecimal.div(totalOrdered);
+              quantityMap = new Map(
+                itemsToTransfer.map((item) => [item.id, item.qty.mul(ratio)])
+              );
+            } else {
+              quantityMap = new Map(
+                itemsToTransfer.map((item) => [item.id, receivedQtyDecimal])
+              );
+            }
+          }
+
+          const transfersToCreate = itemsToTransfer.map((item) => {
+            const qtyDecimal = quantityMap?.get(item.id) ?? item.qty;
+            const unitPriceDecimal = item.unitPrice;
+            const lineTotalDecimal = qtyDecimal.mul(unitPriceDecimal);
+
+            return {
               poId: id,
               poItemId: item.id,
               poNo: existing.poNo,
@@ -151,12 +177,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                 existing.rfq.request?.priority ?? priorityForInventory,
               materialCode: item.material?.code ?? null,
               itemName: item.name,
-              qty: item.qty,
+              qty: qtyDecimal,
               unit: item.unit,
-              unitPrice: item.unitPrice,
-              lineTotal: item.lineTotal,
+              unitPrice: unitPriceDecimal,
+              lineTotal: lineTotalDecimal,
               inventoryStatus,
-            }));
+              ...(receivedAtDate ? { createdAt: receivedAtDate } : {}),
+            } satisfies Prisma.CompletedOrderTransferCreateManyInput;
+          });
 
           if (transfersToCreate.length > 0) {
             await tx.completedOrderTransfer.createMany({

@@ -38,6 +38,19 @@ export async function GET(request: Request) {
       { quotationNo: { contains: search } },
       { request: { code: { contains: search } } },
       { vendor: { nameEn: { contains: search } } },
+      {
+        request: {
+          items: {
+            some: {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { material: { code: { contains: search, mode: "insensitive" } } },
+                { material: { name: { contains: search, mode: "insensitive" } } },
+              ],
+            },
+          },
+        },
+      },
     ];
   }
 
@@ -59,7 +72,24 @@ export async function GET(request: Request) {
       where,
       orderBy,
       include: {
-        request: { select: { id: true, code: true, status: true, priority: true } },
+        request: {
+          select: {
+            id: true,
+            code: true,
+            status: true,
+            priority: true,
+            items: {
+              select: {
+                name: true,
+                unit: true,
+                qty: true,
+                material: { select: { code: true, name: true } },
+              },
+              orderBy: { id: "asc" },
+              take: 1,
+            },
+          },
+        },
         vendor: { select: { id: true, nameEn: true } },
       },
     }),
@@ -83,6 +113,8 @@ export async function GET(request: Request) {
       totalExVat: row.totalExVat.toNumber(),
       totalIncVat: row.totalIncVat.toNumber(),
       note: row.note ?? null,
+      itemCode: row.request?.items?.[0]?.material?.code ?? null,
+      itemName: row.request?.items?.[0]?.material?.name ?? row.request?.items?.[0]?.name ?? null,
     })),
     total,
     page,
@@ -174,4 +206,6 @@ type RFQRow = {
   totalExVat: number;
   totalIncVat: number;
   note: string | null;
+  itemCode: string | null;
+  itemName: string | null;
 };

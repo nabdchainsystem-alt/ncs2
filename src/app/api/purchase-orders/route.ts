@@ -57,6 +57,14 @@ export async function GET(request: Request) {
               { poNo: { contains: search, mode: "insensitive" } },
               { rfq: { quotationNo: { contains: search, mode: "insensitive" } } },
               { vendor: { nameEn: { contains: search, mode: "insensitive" } } },
+              { items: { some: { name: { contains: search, mode: "insensitive" } } } },
+              {
+                items: {
+                  some: {
+                    material: { code: { contains: search, mode: "insensitive" } },
+                  },
+                },
+              },
             ],
           }
         : {}),
@@ -69,6 +77,14 @@ export async function GET(request: Request) {
         include: {
           vendor: { select: { nameEn: true } },
           rfq: { select: { quotationNo: true } },
+          items: {
+            select: {
+              name: true,
+              material: { select: { code: true } },
+            },
+            orderBy: { id: "asc" },
+            take: 1,
+          },
         },
         orderBy: field === "total"
           ? { total: direction }
@@ -80,20 +96,25 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    const rowsDto = rows.map((po) => ({
-      id: po.id,
-      poNo: po.poNo,
-      quotationNo: po.rfq.quotationNo,
-      vendorName: po.vendor.nameEn,
-      subtotal: po.subtotal.toFixed(2),
-      vatPct: po.vatPct.toFixed(2),
-      vatAmount: po.vatAmount.toFixed(2),
-      total: po.total.toFixed(2),
-      currency: po.currency,
-      status: po.status,
-      priority: po.priority,
-      createdAt: po.createdAt.toISOString(),
-    }));
+    const rowsDto = rows.map((po) => {
+      const primaryItem = po.items[0] ?? null;
+      return {
+        id: po.id,
+        poNo: po.poNo,
+        quotationNo: po.rfq.quotationNo,
+        vendorName: po.vendor.nameEn,
+        subtotal: po.subtotal.toFixed(2),
+        vatPct: po.vatPct.toFixed(2),
+        vatAmount: po.vatAmount.toFixed(2),
+        total: po.total.toFixed(2),
+        currency: po.currency,
+        status: po.status,
+        priority: po.priority,
+        createdAt: po.createdAt.toISOString(),
+        primaryItemCode: primaryItem?.material?.code ?? null,
+        primaryItemName: primaryItem?.name ?? null,
+      };
+    });
 
     return NextResponse.json(
       {

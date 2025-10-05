@@ -17,13 +17,7 @@ import {
 import { TableCard, useModalState } from "@/components/data/shared";
 import { useMachines, useDepartments } from "@/hooks/data";
 
-const columns = [
-  "Machine Name",
-  "Machine Code",
-  "Department",
-  "Status",
-  "Actions",
-] as const;
+const columns = ["Machine Name", "Status", "Actions"] as const;
 
 const STATUS_OPTIONS = ["Active", "Inactive"] as const;
 
@@ -205,16 +199,6 @@ export default function MachinesTable() {
         <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
           <Typography variant="small" className="!tw-font-medium !tw-text-blue-gray-600">
             {row.name}
-          </Typography>
-        </td>
-        <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
-          <Typography variant="small" className="!tw-font-medium !tw-text-blue-gray-500">
-            {row.code}
-          </Typography>
-        </td>
-        <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            {row.department?.name ?? "—"}
           </Typography>
         </td>
         <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">

@@ -31,9 +31,12 @@ import { useCreatePurchaseOrder } from "@/hooks/orders/usePurchaseOrders";
 
 const columns = [
   "QUOTATION NO",
-  "REQUEST NO",
+  "REQUEST",
   "VENDOR",
-  "ITEMS",
+  "ITEM CODE",
+  "ITEM NAME",
+  "QTY",
+  "UNIT PRICE",
   "VALUE (SAR)",
   "STATUS",
   "ACTIONS",
@@ -76,7 +79,7 @@ export default function RFQPipeline() {
         items: [
           {
             materialId: undefined,
-            name: row.requestCode ? `${row.requestCode}` : row.quotationNo,
+            name: row.itemName ?? row.itemCode ?? row.requestCode ?? row.quotationNo,
             qty: row.qty > 0 ? row.qty : 1,
             unit: "PC" as const,
             unitPrice: row.unitPrice >= 0 ? row.unitPrice : 0,
@@ -153,12 +156,15 @@ export default function RFQPipeline() {
 
     return rows.map((row) => (
       <tr key={row.id} className="tw-border-t tw-border-blue-gray-50">
-        <td className="tw-px-6 tw-py-4 tw-font-medium tw-text-blue-gray-600">{row.quotationNo}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{row.requestCode ?? "—"}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{row.vendorName ?? "—"}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{row.qty.toLocaleString()}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{formatCurrency(row.totalIncVat)}</td>
-        <td className="tw-px-6 tw-py-4">
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-font-semibold tw-text-blue-gray-600">{row.quotationNo}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.requestCode ?? "—"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.vendorName ?? "Vendor TBD"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.itemCode ?? "—"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-600">{row.itemName ?? "—"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.qty.toLocaleString()}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{formatCurrency(row.unitPrice)}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{formatCurrency(row.totalIncVat)}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center">
           <Chip
             value={row.requestStatus ?? "N/A"}
             variant="ghost"
@@ -175,7 +181,7 @@ export default function RFQPipeline() {
           />
         </td>
         <td className="tw-px-6 tw-py-4">
-          <div className="tw-flex tw-items-center tw-gap-2">
+          <div className="tw-flex tw-items-center tw-justify-center tw-gap-2">
             <IconButton
               variant="text"
               color="blue-gray"
@@ -230,15 +236,15 @@ export default function RFQPipeline() {
               {poAlert.message}
             </Alert>
           ) : null}
-          <table className="tw-min-w-max tw-w-full tw-table-auto">
-            <thead>
+          <table className="tw-min-w-max tw-w-full tw-table-auto tw-text-center">
+            <thead className="tw-bg-blue-gray-50/60">
               <tr>
                 {columns.map((column) => (
                   <th key={column} className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
                     <Typography
                       variant="small"
                       color="blue-gray"
-                      className="tw-text-left tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
+                      className="tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
                     >
                       {column}
                     </Typography>
@@ -251,102 +257,107 @@ export default function RFQPipeline() {
         </CardBody>
       </Card>
 
-      <Dialog
-        open={Boolean(deleteTarget)}
-        handler={() => {
-          if (isDeleting) return;
-          setDeleteError(null);
-          setDeleteTarget(null);
-        }}
-        size="sm"
-      >
-        <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
-          <Typography variant="h5" color="blue-gray">
-            Delete RFQ
-          </Typography>
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            Are you sure you want to delete {deleteTarget?.quotationNo}?
-          </Typography>
-        </DialogHeader>
-        <DialogBody className="tw-space-y-3">
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            This action cannot be undone.
-          </Typography>
-          {deleteError ? (
-            <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
-              {deleteError}
+      {deleteTarget ? (
+        <Dialog
+          open
+          handler={() => {
+            if (isDeleting) return;
+            setDeleteError(null);
+            setDeleteTarget(null);
+          }}
+          size="sm"
+        >
+          <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
+            <Typography variant="h5" color="blue-gray">
+              Delete RFQ
             </Typography>
-          ) : null}
-        </DialogBody>
-        <DialogFooter className="tw-flex tw-gap-3">
-          <Button
-            variant="text"
-            color="blue-gray"
-            onClick={() => {
-              if (isDeleting) return;
-              setDeleteError(null);
-              setDeleteTarget(null);
-            }}
-            disabled={isDeleting}
-          >
-            Cancel
-          </Button>
-          <Button
-            color="red"
-            disabled={isDeleting || !deleteTarget}
-            onClick={async () => {
-              if (!deleteTarget) return;
-              try {
-                setIsDeleting(true);
+            <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+              Are you sure you want to delete {deleteTarget.quotationNo}?
+            </Typography>
+          </DialogHeader>
+          <DialogBody className="tw-space-y-3">
+            <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+              This action cannot be undone.
+            </Typography>
+            {deleteError ? (
+              <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
+                {deleteError}
+              </Typography>
+            ) : null}
+          </DialogBody>
+          <DialogFooter className="tw-flex tw-gap-3">
+            <Button
+              variant="text"
+              color="blue-gray"
+              onClick={() => {
+                if (isDeleting) return;
                 setDeleteError(null);
-                await deleteRFQ(deleteTarget.id);
-                await mutate();
                 setDeleteTarget(null);
-              } catch (err) {
-                if (err instanceof Error) {
-                  setDeleteError(err.message);
-                } else {
-                  setDeleteError("Failed to delete RFQ");
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              disabled={isDeleting}
+              onClick={async () => {
+                try {
+                  setIsDeleting(true);
+                  setDeleteError(null);
+                  await deleteRFQ(deleteTarget.id);
+                  await mutate();
+                  setDeleteTarget(null);
+                } catch (err) {
+                  if (err instanceof Error) {
+                    setDeleteError(err.message);
+                  } else {
+                    setDeleteError("Failed to delete RFQ");
+                  }
+                } finally {
+                  setIsDeleting(false);
                 }
-              } finally {
-                setIsDeleting(false);
-              }
-            }}
-          >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogFooter>
-      </Dialog>
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </Dialog>
+      ) : null}
 
-      <Dialog open={Boolean(editTarget)} handler={() => setEditTarget(null)} size="md">
-        <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
-          <Typography variant="h5" color="blue-gray">
-            Edit RFQ Note
-          </Typography>
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            Update the internal note for this quotation.
-          </Typography>
-        </DialogHeader>
-        <DialogBody className="tw-space-y-4">
-          <Textarea
-            label="Note"
-            variant="outlined"
-            rows={4}
-            value={editTarget?.note ?? ""}
-            onChange={(event) =>
-              setEditTarget((prev) => (prev ? { ...prev, note: event.target.value } : prev))
-            }
-          />
-        </DialogBody>
-        <DialogFooter className="tw-flex tw-gap-3">
-          <Button variant="text" color="blue-gray" onClick={() => setEditTarget(null)}>
-            Cancel
-          </Button>
-          <Button color="gray" onClick={() => setEditTarget(null)}>
-            Save
-          </Button>
-        </DialogFooter>
-      </Dialog>
+      {editTarget ? (
+        <Dialog open handler={() => setEditTarget(null)} size="md">
+          <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
+            <Typography variant="h5" color="blue-gray">
+              Edit RFQ Note
+            </Typography>
+            <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+              Update the internal note for this quotation.
+            </Typography>
+          </DialogHeader>
+          <DialogBody className="tw-space-y-4">
+            <Textarea
+              label="Note"
+              variant="outlined"
+              rows={4}
+              value={editTarget.note}
+              onChange={(event) =>
+                setEditTarget((prev) =>
+                  prev ? { ...prev, note: event.target.value } : prev
+                )
+              }
+            />
+          </DialogBody>
+          <DialogFooter className="tw-flex tw-gap-3">
+            <Button variant="text" color="blue-gray" onClick={() => setEditTarget(null)}>
+              Cancel
+            </Button>
+            <Button color="gray" onClick={() => setEditTarget(null)}>
+              Save
+            </Button>
+          </DialogFooter>
+        </Dialog>
+      ) : null}
     </>
   );
 }

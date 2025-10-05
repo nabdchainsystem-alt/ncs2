@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSWRConfig } from "swr";
 
 import {
@@ -16,7 +16,7 @@ import {
   Textarea,
   Typography,
 } from "@/components/MaterialTailwind";
-import { useVendorsOptions } from "@/hooks/requests";
+import { useVendorsOptions, useRequest } from "@/hooks/requests";
 import { useCreateRFQ } from "@/hooks/requests/useRFQs";
 
 const VAT_PERCENT = 15;
@@ -46,10 +46,12 @@ export default function CreateRfqModal({ open, requestId, onClose, onCreated }: 
   const { options: vendorOptions, refresh: refreshVendors } = useVendorsOptions();
   const { createRFQ } = useCreateRFQ();
   const { mutate: globalMutate } = useSWRConfig();
+  const { data: requestDetails } = useRequest(open ? requestId : null);
 
   const [formState, setFormState] = useState(initialState);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const lastPrefilledRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -59,8 +61,31 @@ export default function CreateRfqModal({ open, requestId, onClose, onCreated }: 
       setFormState(initialState);
       setError(null);
       setIsSubmitting(false);
+      lastPrefilledRequestRef.current = null;
     }
   }, [open, refreshVendors]);
+
+  useEffect(() => {
+    if (!open || !requestId || !requestDetails) {
+      return;
+    }
+
+    if (lastPrefilledRequestRef.current === requestId) {
+      return;
+    }
+
+    const totalQty = Array.isArray(requestDetails.items)
+      ? requestDetails.items.reduce((sum: number, item: any) => {
+          const qtyValue = Number(item.qty ?? item.quantity ?? 0);
+          return Number.isFinite(qtyValue) ? sum + qtyValue : sum;
+        }, 0)
+      : 0;
+
+    if (totalQty > 0) {
+      setFormState((prev) => ({ ...prev, qty: String(totalQty) }));
+      lastPrefilledRequestRef.current = requestId;
+    }
+  }, [open, requestId, requestDetails]);
 
   const qty = Number.parseFloat(formState.qty) || 0;
   const unitPrice = Number.parseFloat(formState.unitPrice) || 0;
@@ -119,8 +144,12 @@ export default function CreateRfqModal({ open, requestId, onClose, onCreated }: 
     }
   };
 
+  if (!open) {
+    return null;
+  }
+
   return (
-    <Dialog open={open} handler={onClose} size="md">
+    <Dialog open handler={onClose} size="md">
       <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
         <Typography variant="h5" color="blue-gray">
           Create RFQ

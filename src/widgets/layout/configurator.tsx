@@ -72,7 +72,9 @@ export function Configurator() {
   return (
     <aside
       className={`tw-fixed tw-top-0 tw-right-0 tw-z-50 tw-h-screen tw-w-96 tw-bg-white tw-px-2.5 tw-shadow-lg tw-transition-transform tw-duration-300 ${
-        openConfigurator ? "tw-translate-x-0" : "tw-translate-x-96"
+        openConfigurator
+          ? "tw-translate-x-0 tw-pointer-events-auto"
+          : "tw-translate-x-96 tw-pointer-events-none"
       }`}
     >
       <div className="tw-flex tw-items-start tw-justify-between tw-px-6 tw-pt-8 tw-pb-6">

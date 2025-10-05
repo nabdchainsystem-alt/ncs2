@@ -3,6 +3,7 @@ import MachinesTable from "@/components/data/MachinesTable";
 import MaterialsTable from "@/components/data/MaterialsTable";
 import VendorsTable from "@/components/data/VendorsTable";
 import WarehousesTable from "@/components/data/WarehousesTable";
+import DataKpiRow from "@/components/data/DataKpiRow";
 
 export default function DataPage() {
   return (
@@ -22,11 +23,14 @@ export default function DataPage() {
           </p>
         </div>
       </section>
-      <DepartmentsTable />
+      <DataKpiRow />
+      <section className="tw-grid tw-grid-cols-1 tw-gap-6 xl:tw-grid-cols-2">
+        <DepartmentsTable />
+        <MachinesTable />
+      </section>
       <WarehousesTable />
       <MaterialsTable />
       <VendorsTable />
-      <MachinesTable />
     </div>
   );
 }

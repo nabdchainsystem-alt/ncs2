@@ -271,68 +271,70 @@ export default function FollowUpCalendar() {
         ) : null}
       </CardBody>
 
-      <Dialog open={open} handler={() => setOpen(false)} size="md">
-        <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
-          <Typography variant="h5" color="blue-gray">
-            Schedule Follow-up
-          </Typography>
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            Create a reminder to follow up on a request.
-          </Typography>
-        </DialogHeader>
-        <DialogBody className="tw-space-y-4">
-          {formError ? <Alert color="red">{formError}</Alert> : null}
-          <Input
-            label="Title"
-            variant="outlined"
-            value={formState.title}
-            onChange={(event) => setFormState((prev) => ({ ...prev, title: event.target.value }))}
-          />
-          <Input
-            type="date"
-            label="Due date"
-            variant="outlined"
-            value={formState.dueDate}
-            onChange={(event) => setFormState((prev) => ({ ...prev, dueDate: event.target.value }))}
-          />
-          <Select
-            label="Priority"
-            variant="outlined"
-            value={formState.priority}
-            onChange={(value) =>
-              setFormState((prev) => ({ ...prev, priority: (value as PriorityValue) ?? "Normal" }))
-            }
-          >
-            {(["Low", "Normal", "High", "Urgent"] as PriorityValue[]).map((option) => (
-              <Option key={option} value={option}>
-                {option}
-              </Option>
-            ))}
-          </Select>
-          <Input
-            label="Request code (optional)"
-            variant="outlined"
-            value={formState.requestCode}
-            onChange={(event) => setFormState((prev) => ({ ...prev, requestCode: event.target.value }))}
-            placeholder="e.g. REQ-20251"
-          />
-          <Textarea
-            label="Notes"
-            variant="outlined"
-            rows={3}
-            value={formState.notes}
-            onChange={(event) => setFormState((prev) => ({ ...prev, notes: event.target.value }))}
-          />
-        </DialogBody>
-        <DialogFooter className="tw-flex tw-gap-3">
-          <Button variant="text" color="blue-gray" onClick={() => setOpen(false)} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button color="gray" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Save"}
-          </Button>
-        </DialogFooter>
-      </Dialog>
+      {open ? (
+        <Dialog open handler={() => setOpen(false)} size="md">
+          <DialogHeader className="tw-flex tw-flex-col tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
+            <Typography variant="h5" color="blue-gray">
+              Schedule Follow-up
+            </Typography>
+            <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+              Create a reminder to follow up on a request.
+            </Typography>
+          </DialogHeader>
+          <DialogBody className="tw-space-y-4">
+            {formError ? <Alert color="red">{formError}</Alert> : null}
+            <Input
+              label="Title"
+              variant="outlined"
+              value={formState.title}
+              onChange={(event) => setFormState((prev) => ({ ...prev, title: event.target.value }))}
+            />
+            <Input
+              type="date"
+              label="Due date"
+              variant="outlined"
+              value={formState.dueDate}
+              onChange={(event) => setFormState((prev) => ({ ...prev, dueDate: event.target.value }))}
+            />
+            <Select
+              label="Priority"
+              variant="outlined"
+              value={formState.priority}
+              onChange={(value) =>
+                setFormState((prev) => ({ ...prev, priority: (value as PriorityValue) ?? "Normal" }))
+              }
+            >
+              {(["Low", "Normal", "High", "Urgent"] as PriorityValue[]).map((option) => (
+                <Option key={option} value={option}>
+                  {option}
+                </Option>
+              ))}
+            </Select>
+            <Input
+              label="Request code (optional)"
+              variant="outlined"
+              value={formState.requestCode}
+              onChange={(event) => setFormState((prev) => ({ ...prev, requestCode: event.target.value }))}
+              placeholder="e.g. REQ-20251"
+            />
+            <Textarea
+              label="Notes"
+              variant="outlined"
+              rows={3}
+              value={formState.notes}
+              onChange={(event) => setFormState((prev) => ({ ...prev, notes: event.target.value }))}
+            />
+          </DialogBody>
+          <DialogFooter className="tw-flex tw-gap-3">
+            <Button variant="text" color="blue-gray" onClick={() => setOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button color="gray" onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </Dialog>
+      ) : null}
     </Card>
   );
 }

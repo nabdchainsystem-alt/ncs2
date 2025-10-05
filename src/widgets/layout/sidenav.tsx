@@ -97,7 +97,9 @@ export default function Sidenav({
       shadow={sidenavType !== "transparent"}
       variant="gradient"
       className={`!tw-fixed tw-top-4 !tw-z-50 tw-h-[calc(100vh-2rem)] tw-w-full tw-max-w-[18rem] tw-p-4 tw-shadow-blue-gray-900/5 ${
-        openSidenav ? "tw-left-4" : "-tw-left-72"
+        openSidenav
+          ? "tw-left-4 tw-pointer-events-auto"
+          : "-tw-left-72 tw-pointer-events-none xl:tw-left-4 xl:tw-pointer-events-auto"
       } ${sidenavType === "transparent" ? "shadow-none" : "shadow-xl"} ${
         sidenavType === "dark" ? "!tw-text-white" : "tw-text-gray-900"
       }} tw-transition-all tw-duration-300 tw-ease-in-out xl:tw-left-4 tw-overflow-y-scroll`}

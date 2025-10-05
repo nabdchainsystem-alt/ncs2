@@ -14,12 +14,7 @@ import {
 import { TableCard, useModalState } from "@/components/data/shared";
 import { useDepartments } from "@/hooks/data";
 
-const columns = [
-  "Department Name",
-  "Department Code",
-  "Department Location",
-  "Actions",
-] as const;
+const columns = ["Department Name", "Actions"] as const;
 
 export default function DepartmentsTable() {
   const { open, openModal, closeModal } = useModalState();
@@ -189,16 +184,6 @@ export default function DepartmentsTable() {
         <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
           <Typography variant="small" className="!tw-font-medium !tw-text-blue-gray-600">
             {row.name}
-          </Typography>
-        </td>
-        <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
-          <Typography variant="small" className="!tw-font-medium !tw-text-blue-gray-500">
-            {row.code}
-          </Typography>
-        </td>
-        <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            {row.location ?? "—"}
           </Typography>
         </td>
         <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">

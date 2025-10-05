@@ -35,8 +35,12 @@ type Props = {
 export default function ViewRequestModal({ requestId, open, onClose }: Props) {
   const { data, isLoading, isError, error } = useRequest(open ? requestId : null);
 
+  if (!open) {
+    return null;
+  }
+
   return (
-    <Dialog open={open} handler={onClose} size="xl" className="tw-max-h-[90vh]">
+    <Dialog open handler={onClose} size="xl" className="tw-max-h-[90vh]">
       <DialogHeader className="tw-flex tw-flex-col tw-items-start tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
         <Typography variant="h5" color="blue-gray">
           Request Details

@@ -3,13 +3,7 @@
 import dynamic from "next/dynamic";
 import useSWR from "swr";
 
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Typography,
-} from "@/components/MaterialTailwind";
+import { Card, CardBody, CardHeader, Typography } from "@/components/MaterialTailwind";
 import BlackBoxKpiCard from "@/components/ui/kpi/BlackBoxKpiCard";
 import {
   ArrowPathIcon,
@@ -118,6 +112,22 @@ export default function MonthlyTrendsSection() {
     trendData.labels.length > 0 &&
     trendData.series.some((series) => series.data.some((value) => value > 0));
 
+  const ordersSeries = trendData.series.find((series) => series.name === "Orders")?.data ?? [];
+  const spendSeries = trendData.series.find((series) => series.name === "Spend (SAR)")?.data ?? [];
+  const totalOrdersTrend = ordersSeries.reduce((sum, value) => sum + (value ?? 0), 0);
+  let topOrderIndex = 0;
+  for (let i = 1; i < ordersSeries.length; i += 1) {
+    if ((ordersSeries[i] ?? 0) > (ordersSeries[topOrderIndex] ?? 0)) {
+      topOrderIndex = i;
+    }
+  }
+  const topOrderLabel = trendData.labels[topOrderIndex] ?? "—";
+  const topOrderValue = ordersSeries[topOrderIndex] ?? 0;
+  const topOrderPercentage = totalOrdersTrend
+    ? (topOrderValue / totalOrdersTrend) * 100
+    : 0;
+  const topOrderSpend = spendSeries[topOrderIndex] ?? 0;
+
   const changeValue = cardsData.changePct;
   const changeLabel = `${changeValue > 0 ? "+" : ""}${percentFormatter.format(changeValue)}%`;
   const changeColor = changeValue >= 0 ? "green" : "red";
@@ -194,50 +204,67 @@ export default function MonthlyTrendsSection() {
               No data available
             </Typography>
           ) : (
-            <MixedChart
-              height={340}
-              series={[
-                {
-                  name: "Orders",
-                  type: "column",
-                  data: trendData.series.find((series) => series.name === "Orders")?.data ?? [],
-                },
-                {
-                  name: "Spend (SAR)",
-                  type: "line",
-                  data:
-                    trendData.series.find((series) => series.name === "Spend (SAR)")?.data ?? [],
-                },
-              ]}
-              options={{
-                xaxis: {
-                  categories: trendData.labels,
-                },
-                stroke: {
-                  width: [0, 4],
-                },
-                dataLabels: {
-                  enabled: false,
-                },
-                legend: {
-                  show: true,
-                  position: "top",
-                },
-                yaxis: [
+            <div className="tw-space-y-4">
+              <MixedChart
+                height={340}
+                series={[
                   {
-                    title: {
-                      text: "Orders",
-                    },
+                    name: "Orders",
+                    type: "column",
+                    data: ordersSeries,
                   },
                   {
-                    opposite: true,
-                    title: {
-                      text: "Spend (SAR)",
-                    },
+                    name: "Spend (SAR)",
+                    type: "line",
+                    data: spendSeries,
                   },
-                ],
-              }}
-            />
+                ]}
+                options={{
+                  xaxis: {
+                    categories: trendData.labels,
+                  },
+                  stroke: {
+                    width: [0, 4],
+                  },
+                  dataLabels: {
+                    enabled: false,
+                  },
+                  legend: {
+                    show: true,
+                    position: "top",
+                  },
+                  yaxis: [
+                    {
+                      title: {
+                        text: "Orders",
+                      },
+                    },
+                    {
+                      opposite: true,
+                      title: {
+                        text: "Spend (SAR)",
+                      },
+                    },
+                  ],
+                }}
+              />
+              <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
+                <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+                  Top month for orders
+                </Typography>
+                <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+                  <Typography variant="h6" color="blue-gray">
+                    {numberFormatter.format(topOrderValue)} orders
+                  </Typography>
+                  <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-cyan-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase tw-text-cyan-700">
+                    {`${Math.round(topOrderPercentage)}% ${topOrderLabel.toUpperCase()}`}
+                  </span>
+                </div>
+                <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+                  Spend in {topOrderLabel}: SAR {currencyFormatter.format(topOrderSpend)}
+                </Typography>
+              </div>
+            </div>
           )}
         </CardBody>
       </Card>

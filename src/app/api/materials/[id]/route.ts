@@ -10,6 +10,7 @@ const updateSchema = z
     name: z.string().min(1).optional(),
     unit: z.enum(["PC", "KG", "L", "Carton", "Pallet"]).optional(),
     category: z.string().min(1).optional(),
+    minQty: z.coerce.number().min(0).optional(),
     warehouseId: z.string().nullable().optional(),
   })
   .refine((data) => Object.values(data).some((value) => value !== undefined), {
@@ -38,6 +39,7 @@ export async function PATCH(
       where: { id: params.id },
       data: {
         ...data,
+        minQty: data.minQty !== undefined ? new Prisma.Decimal(data.minQty) : undefined,
         warehouseId:
           data.warehouseId === undefined
             ? undefined

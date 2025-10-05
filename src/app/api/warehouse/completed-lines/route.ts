@@ -32,6 +32,15 @@ export async function GET(request: Request) {
         where,
         orderBy: { createdAt: "desc" },
         take: parsed.limit ?? 20,
+        include: {
+          purchaseOrderItem: {
+            include: {
+              material: {
+                select: { category: true },
+              },
+            },
+          },
+        },
       }),
     ]);
 
@@ -40,7 +49,7 @@ export async function GET(request: Request) {
       poNo: row.poNo,
       vendorName: row.vendorName,
       vendorId: row.vendorId,
-      itemName: row.itemName,
+      itemName: row.purchaseOrderItem?.name ?? row.itemName,
       materialCode: row.materialCode,
       qty: row.qty.toString(),
       unit: row.unit,
@@ -50,6 +59,7 @@ export async function GET(request: Request) {
       transferStatus: row.transferStatus,
       inventoryStatus: row.inventoryStatus,
       createdAt: row.createdAt.toISOString(),
+      category: row.purchaseOrderItem?.material?.category ?? null,
     }));
 
     return NextResponse.json(

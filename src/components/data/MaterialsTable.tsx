@@ -22,6 +22,7 @@ const columns = [
   "Unit",
   "Category",
   "Warehouse",
+  "Min Qty",
   "Actions",
 ] as const;
 
@@ -34,6 +35,13 @@ const CATEGORY_OPTIONS = [
   "Finished Goods",
   "Spare Parts",
 ] as const;
+
+const CUSTOM_CATEGORY_VALUE = "__custom__" as const;
+
+const qtyFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
 
 export default function MaterialsTable() {
   const { open, openModal, closeModal } = useModalState();
@@ -48,7 +56,9 @@ export default function MaterialsTable() {
     name: "",
     unit: "",
     category: "",
+    customCategory: "",
     warehouseId: "",
+    minQty: "",
   });
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,7 +73,15 @@ export default function MaterialsTable() {
   }, [warehouseOptions]);
 
   const resetForm = () => {
-    setFormState({ code: "", name: "", unit: "", category: "", warehouseId: "" });
+    setFormState({
+      code: "",
+      name: "",
+      unit: "",
+      category: "",
+      customCategory: "",
+      warehouseId: "",
+      minQty: "",
+    });
     setFormError(null);
     setSelectedId(null);
     setMode("create");
@@ -79,12 +97,32 @@ export default function MaterialsTable() {
     try {
       setIsSubmitting(true);
       setFormError(null);
+      const minQtyNumber = Number(formState.minQty || 0);
+
+      if (!Number.isFinite(minQtyNumber) || minQtyNumber < 0) {
+        setFormError("Minimum quantity must be a number greater than or equal to zero");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const categoryValue =
+        formState.category === CUSTOM_CATEGORY_VALUE
+          ? formState.customCategory.trim()
+          : formState.category.trim();
+
+      if (!categoryValue) {
+        setFormError("Category is required");
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload = {
         code: formState.code.trim(),
         name: formState.name.trim(),
         unit: formState.unit as typeof UNIT_OPTIONS[number],
-        category: formState.category.trim(),
+        category: categoryValue,
         warehouseId: formState.warehouseId ? formState.warehouseId : null,
+        minQty: minQtyNumber,
       };
 
       const endpoint =
@@ -100,6 +138,7 @@ export default function MaterialsTable() {
               ...(payload.name ? { name: payload.name } : {}),
               ...(payload.unit ? { unit: payload.unit } : {}),
               ...(payload.category ? { category: payload.category } : {}),
+              minQty: minQtyNumber,
               warehouseId: payload.warehouseId,
             };
 
@@ -133,12 +172,17 @@ export default function MaterialsTable() {
   const openEditModal = (row: typeof rows[number]) => {
     setMode("edit");
     setSelectedId(row.id);
+    const categoryOption = CATEGORY_OPTIONS.includes(row.category as any)
+      ? row.category
+      : CUSTOM_CATEGORY_VALUE;
     setFormState({
       code: row.code,
       name: row.name,
       unit: row.unit,
-      category: row.category,
+      category: categoryOption,
+      customCategory: categoryOption === CUSTOM_CATEGORY_VALUE ? row.category : "",
       warehouseId: row.warehouseId ?? "",
+      minQty: row.minQty ? String(row.minQty) : "0",
     });
     setFormError(null);
     openModal();
@@ -238,6 +282,11 @@ export default function MaterialsTable() {
           </Typography>
         </td>
         <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
+          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+            {qtyFormatter.format(Number(row.minQty ?? 0))}
+          </Typography>
+        </td>
+        <td className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
           <div className="tw-flex tw-gap-2">
             <Button
               size="sm"
@@ -329,14 +378,32 @@ export default function MaterialsTable() {
             label="Category"
             variant="outlined"
             value={formState.category}
-            onChange={(value) => setFormState((prev) => ({ ...prev, category: value ?? "" }))}
+            onChange={(value) =>
+              setFormState((prev) => ({
+                ...prev,
+                category: value ?? "",
+                customCategory: value === CUSTOM_CATEGORY_VALUE ? prev.customCategory : "",
+              }))
+            }
           >
             {CATEGORY_OPTIONS.map((category) => (
               <Option key={category} value={category}>
                 {category}
               </Option>
             ))}
+            <Option value={CUSTOM_CATEGORY_VALUE}>Create custom category</Option>
           </Select>
+          {formState.category === CUSTOM_CATEGORY_VALUE ? (
+            <Input
+              label="Custom Category"
+              variant="outlined"
+              value={formState.customCategory}
+              onChange={(event) =>
+                setFormState((prev) => ({ ...prev, customCategory: event.target.value }))
+              }
+              placeholder="e.g. Packaging Film"
+            />
+          ) : null}
           <Select
             label="Warehouse"
             variant="outlined"
@@ -353,6 +420,15 @@ export default function MaterialsTable() {
               </Option>
             ))}
           </Select>
+          <Input
+            label="Minimum Quantity"
+            type="number"
+            variant="outlined"
+            value={formState.minQty}
+            onChange={(e) => setFormState((prev) => ({ ...prev, minQty: e.target.value }))}
+            inputMode="decimal"
+            min="0"
+          />
           {formError ? (
             <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
               {formError}

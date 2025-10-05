@@ -9,7 +9,7 @@ import {
   CardHeader,
   Typography,
 } from "@/components/MaterialTailwind";
-import { PieChart, VerticalBarChart } from "@/widgets/charts";
+import { VerticalBarChart } from "@/widgets/charts";
 
 const RANGE_OPTIONS = [
   { label: "Weekly", value: "weekly" as const },
@@ -82,6 +82,67 @@ function extractChartData(entries: DepartmentSeriesEntry[]) {
   return { labels, values, total };
 }
 
+function computeTopSummary(data: { labels: string[]; values: number[]; total: number }) {
+  if (!data.total || data.total <= 0 || data.values.length === 0) {
+    return null;
+  }
+
+  let topIndex = 0;
+  for (let i = 1; i < data.values.length; i += 1) {
+    if (data.values[i] > data.values[topIndex]) {
+      topIndex = i;
+    }
+  }
+
+  const topValue = data.values[topIndex] ?? 0;
+  const topLabel = data.labels[topIndex] ?? "—";
+  const percentage = data.total ? (topValue / data.total) * 100 : 0;
+
+  return {
+    label: topLabel,
+    value: topValue,
+    percentage,
+  };
+}
+
+function SummarySection({
+  total,
+  summary,
+  label,
+  color,
+}: {
+  total: number;
+  summary: ReturnType<typeof computeTopSummary> | null;
+  label: string;
+  color: "blue" | "cyan" | "red";
+}) {
+  const colorClasses: Record<"blue" | "cyan" | "red", string> = {
+    blue: "tw-bg-blue-100 tw-text-blue-700",
+    cyan: "tw-bg-cyan-100 tw-text-cyan-700",
+    red: "tw-bg-red-100 tw-text-red-700",
+  };
+
+  return (
+    <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
+      <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+        {label}
+      </Typography>
+      <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+        <Typography variant="h6" color="blue-gray">
+          {total}
+        </Typography>
+        {summary ? (
+          <span
+            className={`tw-inline-flex tw-items-center tw-rounded-full tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase ${colorClasses[color]}`}
+          >
+            {`${summary.percentage.toFixed(0)}% ${summary.label.toUpperCase()}`}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function RequestsDepartmentCharts() {
   const { data, error, isLoading } = useSWR<DepartmentActivityResponse>(
     "/api/requests/analytics/department-activity",
@@ -109,6 +170,9 @@ export default function RequestsDepartmentCharts() {
   const totalChart = useMemo(() => extractChartData(sortedTotal), [sortedTotal]);
   const shareChart = useMemo(() => extractChartData(sortedShare), [sortedShare]);
   const urgentChart = useMemo(() => extractChartData(sortedUrgent), [sortedUrgent]);
+  const totalSummary = useMemo(() => computeTopSummary(totalChart), [totalChart]);
+  const shareSummary = useMemo(() => computeTopSummary(shareChart), [shareChart]);
+  const urgentSummary = useMemo(() => computeTopSummary(urgentChart), [urgentChart]);
 
   const isInitialLoading = !data && isLoading;
 
@@ -160,16 +224,24 @@ export default function RequestsDepartmentCharts() {
         </CardHeader>
         <CardBody className="tw-p-4">
           {renderState(totalChart.total, sortedTotal.length === 0) ?? (
-            <VerticalBarChart
-              height={280}
-              colors={["#6366f1"]}
-              series={[{ name: "Requests", data: totalChart.values }]}
-              options={{
-                xaxis: {
-                  categories: totalChart.labels,
-                },
-              }}
-            />
+            <div className="tw-space-y-4">
+              <VerticalBarChart
+                height={280}
+                colors={["#6366f1"]}
+                series={[{ name: "Requests", data: totalChart.values }]}
+                options={{
+                  xaxis: {
+                    categories: totalChart.labels,
+                  },
+                }}
+              />
+              <SummarySection
+                total={totalChart.total}
+                summary={totalSummary}
+                label="Total requests this range"
+                color="blue"
+              />
+            </div>
           )}
         </CardBody>
       </Card>
@@ -193,29 +265,22 @@ export default function RequestsDepartmentCharts() {
         <CardBody className="tw-p-4">
           {renderState(shareChart.total, sortedShare.length === 0) ?? (
             <div className="tw-space-y-4">
-              <PieChart
-                height={260}
-                labels={shareChart.labels}
-                series={shareChart.values}
-                colors={["#0ea5e9", "#6366f1", "#22c55e", "#f97316", "#facc15", "#e11d48", "#9333ea", "#14b8a6"]}
+              <VerticalBarChart
+                height={280}
+                colors={["#0ea5e9"]}
+                series={[{ name: "Requests", data: shareChart.values }]}
                 options={{
-                  legend: {
-                    show: true,
-                    position: "bottom",
-                    fontSize: "13px",
-                    fontFamily: "inherit",
-                    labels: { colors: "#64748b" },
+                  xaxis: {
+                    categories: shareChart.labels,
                   },
                 }}
               />
-              <div className="tw-text-center">
-                <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
-                  Total requests
-                </Typography>
-                <Typography variant="h5" color="blue-gray">
-                  {shareChart.total}
-                </Typography>
-              </div>
+              <SummarySection
+                total={shareChart.total}
+                summary={shareSummary}
+                label="Total requests"
+                color="cyan"
+              />
             </div>
           )}
         </CardBody>
@@ -239,16 +304,24 @@ export default function RequestsDepartmentCharts() {
         </CardHeader>
         <CardBody className="tw-p-4">
           {renderState(urgentChart.total, sortedUrgent.length === 0) ?? (
-            <VerticalBarChart
-              height={280}
-              colors={["#f87171"]}
-              series={[{ name: "Urgent", data: urgentChart.values }]}
-              options={{
-                xaxis: {
-                  categories: urgentChart.labels,
-                },
-              }}
-            />
+            <div className="tw-space-y-4">
+              <VerticalBarChart
+                height={280}
+                colors={["#f87171"]}
+                series={[{ name: "Urgent", data: urgentChart.values }]}
+                options={{
+                  xaxis: {
+                    categories: urgentChart.labels,
+                  },
+                }}
+              />
+              <SummarySection
+                total={urgentChart.total}
+                summary={urgentSummary}
+                label="Total urgent requests"
+                color="red"
+              />
+            </div>
           )}
         </CardBody>
       </Card>

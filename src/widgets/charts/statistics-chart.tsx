@@ -1,4 +1,7 @@
-import React from "react";
+"use client";
+
+import React, { useMemo } from "react";
+import dynamic from "next/dynamic";
 
 // @material-tailwind/react
 import {
@@ -9,8 +12,8 @@ import {
   Typography,
 } from "@material-tailwind/react";
 
-// react-apexcharts
-import Chart from "react-apexcharts";
+const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
+import { useApexContainer } from "./useApexContainer";
 
 type PropTypes = {
   chart: {};
@@ -47,6 +50,17 @@ export function StatisticsChart({
   description,
   footer = null,
 }: PropTypes) {
+  const { containerRef, ready, width } = useApexContainer();
+  const chartHeight = useMemo(() => {
+    if (chart && typeof chart === "object" && "height" in chart) {
+      const value = (chart as { height?: number }).height;
+      if (typeof value === "number") {
+        return value;
+      }
+    }
+    return 280;
+  }, [chart]);
+
   return (
     <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm">
       <CardHeader
@@ -55,7 +69,18 @@ export function StatisticsChart({
         floated={false}
         shadow={false}
       >
-        <Chart {...chart} />
+        <div ref={containerRef} className="tw-w-full">
+          {ready ? (
+            <ReactApexChart {...chart} width={width || undefined} />
+          ) : (
+            <div
+              className="tw-grid tw-w-full tw-place-items-center tw-text-white/80"
+              style={{ height: chartHeight }}
+            >
+              Loading chart…
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardBody className="tw-px-6 !tw-pt-0">
         <Typography variant="h6" color="blue-gray">

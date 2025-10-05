@@ -46,6 +46,8 @@ const PRIORITY_CHIP_COLORS: Record<RequestRow["priority"], "green" | "blue" | "a
 
 const TABLE_HEADERS = [
   "REQUEST",
+  "ITEM CODE",
+  "ITEM NAME",
   "CREATED",
   "DEPARTMENT",
   "WAREHOUSE",
@@ -184,15 +186,17 @@ export default function AllRequestsTable() {
 
     return safeRows.map((row) => (
       <tr key={row.id} className="tw-border-t tw-border-blue-gray-50">
-        <td className="tw-px-6 tw-py-4 tw-font-medium tw-text-blue-gray-600">{row.code}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{formatDate(row.createdAt)}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{row.departmentName ?? "—"}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{row.warehouseName ?? "—"}</td>
-        <td className="tw-px-6 tw-py-4 tw-text-blue-gray-500">{row.machineName ?? "—"}</td>
-        <td className="tw-px-6 tw-py-4">{renderStatusChip(row.status)}</td>
-        <td className="tw-px-6 tw-py-4">{renderPriorityChip(row.priority)}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-font-semibold tw-text-blue-gray-600">{row.code}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.primaryItemCode ?? "—"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-600">{row.primaryItemName ?? "—"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{formatDate(row.createdAt)}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.departmentName ?? "—"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.warehouseName ?? "—"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center tw-text-blue-gray-500">{row.machineName ?? "—"}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center">{renderStatusChip(row.status)}</td>
+        <td className="tw-px-6 tw-py-4 tw-text-center">{renderPriorityChip(row.priority)}</td>
         <td className="tw-px-6 tw-py-4">
-          <div className="tw-flex tw-items-center tw-gap-2">
+          <div className="tw-flex tw-items-center tw-justify-center tw-gap-2">
             <IconButton
               variant="text"
               color="blue-gray"
@@ -280,8 +284,8 @@ export default function AllRequestsTable() {
           </div>
         </CardHeader>
         <CardBody className="tw-overflow-x-auto tw-p-0">
-          <table className="tw-w-full tw-text-left">
-            <thead>
+          <table className="tw-w-full tw-table-auto tw-text-center">
+          <thead className="tw-bg-blue-gray-50/60">
               <tr>
                 {TABLE_HEADERS.map((header) => (
                   <th key={header} className="tw-px-6 tw-py-4">
@@ -350,49 +354,51 @@ export default function AllRequestsTable() {
         }}
       />
 
-      <Dialog
-        open={Boolean(deleteTarget)}
-        handler={() => {
-          setDeleteTarget(null);
-          setDeleteError(null);
-        }}
-        size="sm"
-      >
-        <DialogHeader className="tw-flex tw-flex-col tw-items-start tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
-          <Typography variant="h5" color="blue-gray">
-            Delete Request
-          </Typography>
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            Permanently remove {deleteTarget?.code} and its items?
-          </Typography>
-        </DialogHeader>
-        <DialogBody className="tw-space-y-3">
-          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
-            This action cannot be undone.
-          </Typography>
-          {deleteError ? (
-            <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
-              {deleteError}
+      {deleteTarget ? (
+        <Dialog
+          open
+          handler={() => {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }}
+          size="sm"
+        >
+          <DialogHeader className="tw-flex tw-flex-col tw-items-start tw-gap-1 tw-rounded-t-xl tw-border-b tw-border-blue-gray-50">
+            <Typography variant="h5" color="blue-gray">
+              Delete Request
             </Typography>
-          ) : null}
-        </DialogBody>
-        <DialogFooter className="tw-flex tw-gap-3">
-          <Button
-            variant="text"
-            color="blue-gray"
-            onClick={() => {
-              setDeleteTarget(null);
-              setDeleteError(null);
-            }}
-            disabled={isDeleting}
-          >
-            Cancel
-          </Button>
-          <Button color="red" onClick={handleDeleteRequest} disabled={isDeleting}>
-            {isDeleting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogFooter>
-      </Dialog>
+            <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+              Permanently remove {deleteTarget.code} and its items?
+            </Typography>
+          </DialogHeader>
+          <DialogBody className="tw-space-y-3">
+            <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+              This action cannot be undone.
+            </Typography>
+            {deleteError ? (
+              <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
+                {deleteError}
+              </Typography>
+            ) : null}
+          </DialogBody>
+          <DialogFooter className="tw-flex tw-gap-3">
+            <Button
+              variant="text"
+              color="blue-gray"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteError(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleDeleteRequest} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </Dialog>
+      ) : null}
     </>
   );
 }

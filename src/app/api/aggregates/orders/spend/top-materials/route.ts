@@ -31,16 +31,52 @@ export async function GET(request: Request) {
       take: limit,
     });
 
+    const requestCache = new Map<string, { materialName: string | null; itemName: string | null } | null>();
+
     const rows = await Promise.all(
       grouped.map(async (row) => {
         let materialLabel = row.name ?? "Unassigned";
+
         if (row.materialId) {
           const material = await prisma.material.findUnique({
             where: { id: row.materialId },
             select: { name: true },
           });
+
           if (material?.name) {
             materialLabel = material.name;
+          }
+        } else if (row.name) {
+          let cached = requestCache.get(row.name);
+
+          if (cached === undefined) {
+            const request = await prisma.request.findUnique({
+              where: { code: row.name },
+              select: {
+                items: {
+                  orderBy: { id: "asc" },
+                  take: 1,
+                  select: {
+                    name: true,
+                    material: { select: { name: true } },
+                  },
+                },
+              },
+            });
+
+            const item = request?.items?.[0];
+            cached = item
+              ? {
+                  materialName: item.material?.name ?? null,
+                  itemName: item.name ?? null,
+                }
+              : null;
+
+            requestCache.set(row.name, cached);
+          }
+
+          if (cached) {
+            materialLabel = cached.materialName ?? cached.itemName ?? materialLabel;
           }
         }
 

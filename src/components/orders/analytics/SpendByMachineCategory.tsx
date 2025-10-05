@@ -76,6 +76,16 @@ export default function SpendByMachineCategory() {
 
   const rows = data?.rows ?? [];
   const hasData = rows.length > 0;
+  const totalSpend = rows.reduce((sum, row) => sum + Number(row.total ?? 0), 0);
+  const topMachine = rows.reduce<MachineRow | null>((current, row) => {
+    if (!current || Number(row.total ?? 0) > Number(current.total ?? 0)) {
+      return row;
+    }
+    return current;
+  }, null);
+  const topMachinePct = topMachine
+    ? topMachine.sharePct ?? (totalSpend ? (Number(topMachine.total ?? 0) / totalSpend) * 100 : 0)
+    : 0;
 
   return (
     <section className="tw-space-y-6">
@@ -172,15 +182,32 @@ export default function SpendByMachineCategory() {
               No data available
             </Typography>
           ) : (
-            <VerticalBarChart
-              height={320}
-              series={[{ name: "Total Spend", data: rows.map((row) => Number(row.total ?? 0)) }]}
-              options={{
-                xaxis: {
-                  categories: rows.map((row) => row.machine),
-                },
-              }}
-            />
+            <div className="tw-space-y-4">
+              <VerticalBarChart
+                height={320}
+                series={[{ name: "Total Spend", data: rows.map((row) => Number(row.total ?? 0)) }]}
+                options={{
+                  xaxis: {
+                    categories: rows.map((row) => row.machine),
+                  },
+                }}
+              />
+              <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
+                <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+                  Aggregate machine spend
+                </Typography>
+                <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+                  <Typography variant="h6" color="blue-gray">
+                    {formatCurrency(totalSpend)}
+                  </Typography>
+                  {topMachine ? (
+                    <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-blue-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase tw-text-blue-700">
+                      {`${Math.round(topMachinePct)}% ${topMachine.machine.toUpperCase()}`}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
           )}
         </CardBody>
       </Card>

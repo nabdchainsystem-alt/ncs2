@@ -1,16 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Typography,
-} from "@/components/MaterialTailwind";
+import { Button, Card, CardBody, CardHeader, Typography } from "@/components/MaterialTailwind";
 import BlackBoxKpiCard from "@/components/ui/kpi/BlackBoxKpiCard";
 import { useOrdersUrgent } from "@/hooks/orders/useOrdersUrgent";
 import { useChartReady } from "./useChartReady";
@@ -95,6 +88,39 @@ export default function UrgentOrdersOverview() {
   const byDeptHasData =
     byDept.labels.length > 0 && byDept.data.some((value) => value > 0);
   const deptTotal = byDept.data.reduce((sum, value) => sum + value, 0);
+  const statusTotals = useMemo(
+    () =>
+      status.labels.map((_, index) =>
+        status.series.reduce((sum, series) => sum + (series.data[index] ?? 0), 0)
+      ),
+    [status.labels, status.series]
+  );
+  const statusTotal = useMemo(
+    () => statusTotals.reduce((sum, value) => sum + value, 0),
+    [statusTotals]
+  );
+  const statusSummary = useMemo(() => {
+    if (!statusTotal || statusTotals.length === 0) {
+      return null;
+    }
+
+    let topIndex = 0;
+    for (let i = 1; i < statusTotals.length; i += 1) {
+      if (statusTotals[i] > statusTotals[topIndex]) {
+        topIndex = i;
+      }
+    }
+
+    const topValue = statusTotals[topIndex] ?? 0;
+    const topLabel = status.labels[topIndex] ?? "—";
+    const percentage = statusTotal ? (topValue / statusTotal) * 100 : 0;
+
+    return {
+      label: topLabel,
+      value: topValue,
+      percentage,
+    };
+  }, [status.labels, statusTotal, statusTotals]);
 
   return (
     <section className="tw-space-y-6">
@@ -187,26 +213,43 @@ export default function UrgentOrdersOverview() {
                 No data available
               </Typography>
             ) : (
-              <VerticalBarChart
-                height={320}
-                series={status.series}
-                options={{
-                  chart: {
-                    stacked: true,
-                  },
-                  xaxis: {
-                    categories: status.labels,
-                  },
-                  legend: {
-                    position: "top",
-                  },
-                  plotOptions: {
-                    bar: {
-                      borderRadius: 4,
+              <div className="tw-space-y-4">
+                <VerticalBarChart
+                  height={320}
+                  series={status.series}
+                  options={{
+                    chart: {
+                      stacked: true,
                     },
-                  },
-                }}
-              />
+                    xaxis: {
+                      categories: status.labels,
+                    },
+                    legend: {
+                      position: "top",
+                    },
+                    plotOptions: {
+                      bar: {
+                        borderRadius: 4,
+                      },
+                    },
+                  }}
+                />
+                <div className="tw-border-t tw-border-blue-gray-50 tw-pt-4">
+                  <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+                    Total urgent orders
+                  </Typography>
+                  <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+                    <Typography variant="h6" color="blue-gray">
+                      {statusTotal}
+                    </Typography>
+                    {statusSummary ? (
+                      <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-indigo-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase tw-text-indigo-700">
+                        {`${statusSummary.percentage.toFixed(0)}% ${statusSummary.label.toUpperCase()}`}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             )}
           </CardBody>
         </Card>
@@ -273,12 +316,9 @@ export default function UrgentOrdersOverview() {
                       SAR {deptTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Typography>
                     {byDept.topDepartment ? (
-                      <Chip
-                        value={`${Math.round(byDept.topDepartmentPct ?? 0)}% ${byDept.topDepartment}`}
-                        color="blue"
-                        variant="ghost"
-                        className="tw-w-fit tw-text-xs !tw-font-semibold"
-                      />
+                      <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-blue-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase tw-text-blue-700">
+                        {`${Math.round(byDept.topDepartmentPct ?? 0)}% ${byDept.topDepartment.toUpperCase()}`}
+                      </span>
                     ) : null}
                   </div>
                 </div>

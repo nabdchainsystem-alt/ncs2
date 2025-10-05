@@ -11,11 +11,25 @@ type RequestRowRecord = Prisma.RequestGetPayload<{
     warehouse: { select: { id: true; name: true } };
     machine: { select: { id: true; name: true } };
     vendor: { select: { id: true; nameEn: true } };
+    items: {
+      select: {
+        name: true;
+        unit: true;
+        qty: true;
+        material: { select: { code: true; name: true } };
+      };
+      orderBy: { id: "asc" };
+      take: 1;
+    };
     _count: { select: { items: true } };
   };
 }>;
 
-type RequestRow = Omit<RequestRowRecord, "_count"> & { itemsCount: number };
+type RequestRow = Omit<RequestRowRecord, "_count" | "items"> & {
+  itemsCount: number;
+  primaryItemCode: string | null;
+  primaryItemName: string | null;
+};
 
 const SORTABLE_FIELDS = new Set<keyof Prisma.RequestOrderByWithRelationInput>([
   "code",
@@ -47,6 +61,17 @@ export async function GET(request: Request) {
       OR: [
         { code: { contains: search } },
         { description: { contains: search } },
+        {
+          items: {
+            some: {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { material: { code: { contains: search, mode: "insensitive" } } },
+                { material: { name: { contains: search, mode: "insensitive" } } },
+              ],
+            },
+          },
+        },
       ],
     });
   }
@@ -102,16 +127,32 @@ export async function GET(request: Request) {
         warehouse: { select: { id: true, name: true } },
         machine: { select: { id: true, name: true } },
         vendor: { select: { id: true, nameEn: true } },
+        items: {
+          select: {
+            name: true,
+            unit: true,
+            qty: true,
+            material: { select: { code: true, name: true } },
+          },
+          orderBy: { id: "asc" },
+          take: 1,
+        },
         _count: { select: { items: true } },
       },
     }),
     prisma.request.count({ where }),
   ]);
 
-  const rows: RequestRow[] = records.map(({ _count, ...rest }) => ({
-    ...rest,
-    itemsCount: _count.items,
-  }));
+  const rows: RequestRow[] = records.map(({ _count, items, ...rest }) => {
+    const primaryItem = items[0] ?? null;
+
+    return {
+      ...rest,
+      itemsCount: _count.items,
+      primaryItemCode: primaryItem?.material?.code ?? null,
+      primaryItemName: primaryItem?.material?.name ?? primaryItem?.name ?? null,
+    } satisfies RequestRow;
+  });
 
   const payload: PageDto<RequestRow> = {
     rows,

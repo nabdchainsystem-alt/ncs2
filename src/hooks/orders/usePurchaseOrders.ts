@@ -24,6 +24,8 @@ export type PoListRow = {
   status: PoStatus;
   priority: Priority;
   createdAt: string;
+  primaryItemCode: string | null;
+  primaryItemName: string | null;
 };
 
 export type PoDetail = {

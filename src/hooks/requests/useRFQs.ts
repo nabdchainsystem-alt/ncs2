@@ -18,6 +18,8 @@ export type RFQRow = {
   totalExVat: number;
   totalIncVat: number;
   note: string | null;
+  itemCode: string | null;
+  itemName: string | null;
 };
 
 export type RFQParams = {
