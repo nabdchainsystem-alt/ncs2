@@ -1,7 +1,9 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 import { buildBoundaries, type Bucket } from "@/server/dateBuckets";
 
 type Kind = "requests" | "orders";

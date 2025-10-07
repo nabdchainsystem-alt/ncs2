@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

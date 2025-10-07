@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { RequestStatus } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const STATUS_TO_STAGE: Record<RequestStatus, string> = {
   OPEN: "APPROVED",

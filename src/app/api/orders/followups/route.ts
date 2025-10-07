@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Priority } from "@prisma/client";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const querySchema = z.object({
   from: z.string().optional(),

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 function buildActivity(payload: Awaited<ReturnType<typeof prisma.purchaseOrder.findMany>>[number]) {
   const createdAt = payload.createdAt.getTime();

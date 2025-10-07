@@ -1,6 +1,6 @@
 import { Priority } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 export async function aggregateUrgentByDepartment() {
   const urgentOrders = await prisma.purchaseOrder.findMany({

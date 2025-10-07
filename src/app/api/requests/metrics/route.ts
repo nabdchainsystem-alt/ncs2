@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Priority, RequestStatus } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
 

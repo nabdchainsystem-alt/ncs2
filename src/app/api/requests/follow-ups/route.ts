@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const createSchema = z.object({
   title: z.string().min(1),

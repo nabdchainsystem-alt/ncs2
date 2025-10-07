@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 import { CURRENCY, decimalToNumber } from "../utils";
 

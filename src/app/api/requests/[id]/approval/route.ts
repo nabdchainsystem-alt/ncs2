@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ApprovalStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const approvalSchema = z.object({
   approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]),

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { TransferInventoryStatus } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const UNASSIGNED_WAREHOUSE = "Unassigned Warehouse";
 

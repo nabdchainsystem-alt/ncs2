@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 import { buildBoundaries, type Bucket } from "@/server/dateBuckets";
 
 const SIGNAL_ORDER = ["New", "Pending", "Approved", "Closed"] as const;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { Prisma } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const FALLBACK = {
   totalOrders: 0,

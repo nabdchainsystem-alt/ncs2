@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Priority } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 export async function GET() {
   try {

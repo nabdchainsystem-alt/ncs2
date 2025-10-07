@@ -7,7 +7,7 @@ import {
 } from "@prisma/client";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const paramsSchema = z.object({
   id: z.string().min(1),

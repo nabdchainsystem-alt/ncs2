@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma, RequestStatus } from "@prisma/client";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 
 const statusSchema = z.object({
   status: z.enum(["OPEN", "PENDING", "CLOSED", "CANCELLED"]),

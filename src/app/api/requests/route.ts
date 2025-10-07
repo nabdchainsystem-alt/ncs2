@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma, RequestStatus, Priority } from "@prisma/client";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/server/db";
 import { parsePaginationParams, PageDto } from "@/lib/api/pagination";
 
 type RequestRowRecord = Prisma.RequestGetPayload<{
