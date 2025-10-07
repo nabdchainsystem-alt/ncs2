@@ -1,11 +1,12 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/server/db";
 
 const MS_IN_DAY = 1000 * 60 * 60 * 24;
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export async function GET() {
   try {

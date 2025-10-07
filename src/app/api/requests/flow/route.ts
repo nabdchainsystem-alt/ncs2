@@ -1,7 +1,12 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 import { RequestStatus } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { tableExists } from "@/server/db-utils";
 
 const STATUS_TO_STAGE: Record<RequestStatus, string> = {
   OPEN: "APPROVED",
@@ -33,14 +38,7 @@ function addDays(base: Date, amount: number) {
 }
 
 async function hasStatusLogTable() {
-  try {
-    const rows = (await prisma.$queryRaw<{ name: string }[]>`
-      SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'RequestStatusChange';
-    `) as { name: string }[];
-    return rows.length > 0;
-  } catch {
-    return false;
-  }
+  return tableExists("RequestStatusChange");
 }
 
 async function computeBreachRatios(start: Date, inclusiveEnd: Date) {

@@ -1,10 +1,11 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const CURRENCY = "SAR";
 const MS_IN_DAY = 1000 * 60 * 60 * 24;

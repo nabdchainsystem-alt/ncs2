@@ -1,12 +1,13 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
 import { parsePaginationParams, PageDto } from "@/lib/api/pagination";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const createVendorSchema = z.object({
   nameEn: z.string().min(1),

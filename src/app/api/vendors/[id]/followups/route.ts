@@ -1,11 +1,12 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 import { Prisma, Priority } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const STATUS_WHITELIST = new Set(["open", "in-progress", "completed", "overdue"]);
 

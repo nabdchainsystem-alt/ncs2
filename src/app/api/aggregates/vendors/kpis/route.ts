@@ -1,11 +1,12 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/server/db";
 
 import { CURRENCY, decimalToNumber, orderStatusesBuckets } from "../utils";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const FALLBACK = {
   total: 0,

@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { tableExists } from "@/server/db-utils";
 import { buildBoundaries, type Bucket } from "@/server/dateBuckets";
 
 type Kind = "requests" | "orders";
@@ -75,23 +76,6 @@ function countInRange(dates: Date[], from: Date, to: Date) {
 function includesDetail(detail: string | null | undefined, term: string) {
   if (!detail) return false;
   return detail.toLowerCase().includes(term.toLowerCase());
-}
-
-async function tableExists(tableName: string) {
-  try {
-    const rows = await prisma.$queryRaw<{ name: string }[]>(
-      Prisma.sql`
-        SELECT name
-        FROM sqlite_master
-        WHERE type = 'table' AND name = ${tableName}
-        LIMIT 1
-      `
-    );
-    return rows.length > 0;
-  } catch (error) {
-    console.warn(`Failed to inspect table ${tableName}`, error);
-    return false;
-  }
 }
 
 async function aggregateRequests(bounds: Boundary[]): Promise<Series[]> {
