@@ -2,11 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
 
 import { CURRENCY, decimalToNumber } from "../utils";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET(request: Request) {
   try {
@@ -45,15 +44,12 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json(
-      {
-        rows,
-        currency: CURRENCY,
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      rows,
+      currency: CURRENCY,
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/vendors/materials-top", error);
-    return NextResponse.json({ rows: [], currency: CURRENCY }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

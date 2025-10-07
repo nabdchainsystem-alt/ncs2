@@ -2,83 +2,94 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
 import { parsePaginationParams, PageDto } from "@/lib/api/pagination";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const createWarehouseSchema = z.object({
   name: z.string().min(1),
-  code: z.string().min(1),
+  code: z.string().min(1).optional(),
   location: z.string().nullable().optional(),
   sizeM2: z.number().int().nonnegative().nullable().optional(),
 });
 
-type WarehousePayload = z.infer<typeof createWarehouseSchema>;
-
 const sortableFields = new Set(["name", "code", "location", "sizeM2", "createdAt", "updatedAt"]);
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const { page, pageSize, search, sortField, sortDirection } = parsePaginationParams(url);
-  const skip = (page - 1) * pageSize;
+  try {
+    const url = new URL(request.url);
+    const { page, pageSize, search, sortField, sortDirection } = parsePaginationParams(url);
+    const skip = (page - 1) * pageSize;
 
-  const where = search
-    ? {
-        OR: [
-          { name: { contains: search } },
-          { code: { contains: search } },
-          { location: { contains: search } },
-        ],
-      }
-    : undefined;
+    const where = search
+      ? {
+          OR: [
+            { name: { contains: search } },
+            { code: { contains: search } },
+            { location: { contains: search } },
+          ],
+        }
+      : undefined;
 
-  const orderBy = sortField && sortableFields.has(sortField)
-    ? { [sortField]: sortDirection ?? "asc" }
-    : { createdAt: "desc" as const };
+    const orderBy = sortField && sortableFields.has(sortField)
+      ? { [sortField]: sortDirection ?? "asc" }
+      : { createdAt: "desc" as const };
 
-  const [rows, total] = await Promise.all([
-    prisma.warehouse.findMany({
-      skip,
-      take: pageSize,
-      where,
-      orderBy,
-    }),
-    prisma.warehouse.count({ where }),
-  ]);
+    const [rows, total] = await Promise.all([
+      prisma.warehouse.findMany({
+        skip,
+        take: pageSize,
+        where,
+        orderBy,
+      }),
+      prisma.warehouse.count({ where }),
+    ]);
 
-  const payload: PageDto<typeof rows[number]> = {
-    rows,
-    total,
-    page,
-    pageSize,
-  };
+    const payload: PageDto<typeof rows[number]> = {
+      rows,
+      total,
+      page,
+      pageSize,
+    };
 
-  return NextResponse.json(payload);
+    return ok(payload);
+  } catch (error: any) {
+    return fail(500, "Server error", error?.message);
+  }
 }
 
 export async function POST(request: Request) {
   try {
-    const json = await request.json();
-    const data = createWarehouseSchema.parse(json);
-
-    const warehouse = await prisma.warehouse.create({
-      data,
-    });
-
-    return NextResponse.json(warehouse, { status: 201 });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload", issues: error.issues }, { status: 400 });
+    const body = await readJson(request);
+    const parsed = createWarehouseSchema.safeParse(body);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
     }
 
+    const data = parsed.data;
+
+    const warehouse = await prisma.warehouse.create({
+      data: {
+        name: data.name,
+        location: data.location ?? null,
+        sizeM2: data.sizeM2 ?? null,
+        ...(data.code ? { code: data.code } : {}),
+      },
+    });
+
+    return ok(warehouse, 201);
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json({ message: "Warehouse code must be unique" }, { status: 409 });
+      return fail(409, "Warehouse code must be unique");
     }
 
     console.error("POST /api/warehouses", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

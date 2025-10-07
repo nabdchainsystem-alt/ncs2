@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Priority } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET() {
   try {
@@ -41,9 +41,9 @@ export async function GET() {
       data.push(entry._count._all);
     });
 
-    return NextResponse.json({ labels, data }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
+    return ok({ labels, data });
+  } catch (error: any) {
     console.error("GET /api/requests/analytics/urgent-by-department", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

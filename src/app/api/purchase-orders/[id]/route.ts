@@ -2,7 +2,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import {
   POStatus,
   Prisma,
@@ -12,6 +11,7 @@ import {
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const paramsSchema = z.object({
   id: z.string().min(1),
@@ -31,7 +31,11 @@ const updateSchema = z
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = paramsSchema.parse(await context.params);
+    const paramsResult = paramsSchema.safeParse(await context.params);
+    if (!paramsResult.success) {
+      return fail(400, "Validation error", paramsResult.error.flatten().fieldErrors);
+    }
+    const { id } = paramsResult.data;
 
     const po = await prisma.purchaseOrder.findUnique({
       where: { id },
@@ -47,7 +51,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     });
 
     if (!po) {
-      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+      return fail(404, "Purchase order not found");
     }
 
     const responseBody = {
@@ -77,23 +81,27 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       })),
     };
 
-    return NextResponse.json(responseBody, {
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
+    return ok(responseBody);
+  } catch (error: any) {
     console.error(`GET /api/purchase-orders/:id`, error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid request" }, { status: 400 });
-    }
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = paramsSchema.parse(await context.params);
-    const payload = await request.json();
-    const data = updateSchema.parse(payload);
+    const paramsResult = paramsSchema.safeParse(await context.params);
+    if (!paramsResult.success) {
+      return fail(400, "Validation error", paramsResult.error.flatten().fieldErrors);
+    }
+    const { id } = paramsResult.data;
+
+    const payload = await readJson(request);
+    const parsed = updateSchema.safeParse(payload);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
+    const data = parsed.data;
     const { status, priority, receivedAt, receivedQty } = data;
 
     const existing = await prisma.purchaseOrder.findUnique({
@@ -110,7 +118,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     });
 
     if (!existing) {
-      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+      return fail(404, "Purchase order not found");
     }
 
     const updateData: Prisma.PurchaseOrderUpdateInput = {};
@@ -211,19 +219,19 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       });
 
     if (!updated) {
-      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+      return fail(404, "Purchase order not found");
     }
 
-    return NextResponse.json({ success: true }, {
-      status: 200,
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
+    return ok({ success: true });
+  } catch (error: any) {
     console.error(`PATCH /api/purchase-orders/:id`, error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload" }, { status: 400 });
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    if (error instanceof z.ZodError) {
+      return fail(400, "Validation error", error.flatten().fieldErrors);
+    }
+    return fail(500, "Server error", error?.message);
   }
 }
 

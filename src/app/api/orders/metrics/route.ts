@@ -2,11 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { Priority } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -62,19 +61,14 @@ export async function GET() {
       }),
     ]);
 
-    return NextResponse.json(
-      {
-        newOrdersToday,
-        urgentOrdersToday,
-        timeCriticalOrders,
-        followUpsDueToday,
-      },
-      {
-        headers: { "Cache-Control": "no-store" },
-      }
-    );
-  } catch (error) {
+    return ok({
+      newOrdersToday,
+      urgentOrdersToday,
+      timeCriticalOrders,
+      followUpsDueToday,
+    });
+  } catch (error: any) {
     console.error("GET /api/orders/metrics", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

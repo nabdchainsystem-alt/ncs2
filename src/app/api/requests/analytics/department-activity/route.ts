@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Priority } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
 
@@ -117,21 +117,18 @@ export async function GET() {
 
     const serialize = (groups: GroupedResult) => toSeries(groups, departmentMap);
 
-    return NextResponse.json(
-      {
-        total: {
-          weekly: serialize(weeklyTotal),
-          monthly: serialize(monthlyTotal),
-        },
-        urgent: {
-          weekly: serialize(weeklyUrgent),
-          monthly: serialize(monthlyUrgent),
-        },
+    return ok({
+      total: {
+        weekly: serialize(weeklyTotal),
+        monthly: serialize(monthlyTotal),
       },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+      urgent: {
+        weekly: serialize(weeklyUrgent),
+        monthly: serialize(monthlyUrgent),
+      },
+    });
+  } catch (error: any) {
     console.error("GET /api/requests/analytics/department-activity", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

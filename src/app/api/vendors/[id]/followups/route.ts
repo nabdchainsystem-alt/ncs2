@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma, Priority } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const STATUS_WHITELIST = new Set(["open", "in-progress", "completed", "overdue"]);
 
@@ -81,16 +81,10 @@ export async function GET(
       },
     });
 
-    return NextResponse.json(
-      { rows },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({ rows });
+  } catch (error: any) {
     console.error("GET /api/vendors/[id]/followups", params.id, error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }
 
@@ -99,23 +93,26 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const json = await request.json();
-    const parsed = createFollowupSchema.parse(json);
+    const json = await readJson(request);
+    const parsed = createFollowupSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
 
-    const status = parsed.status && STATUS_WHITELIST.has(parsed.status)
-      ? parsed.status
+    const status = parsed.data.status && STATUS_WHITELIST.has(parsed.data.status)
+      ? parsed.data.status
       : "open";
 
     const followup = await prisma.followup.create({
       data: {
         vendorId: params.id,
-        title: parsed.title,
-        dueAt: new Date(parsed.dueAt),
-        priority: mapPriority(parsed.priority),
+        title: parsed.data.title,
+        dueAt: new Date(parsed.data.dueAt),
+        priority: mapPriority(parsed.data.priority),
         status,
-        relatedType: parsed.relatedType,
-        relatedId: parsed.relatedId,
-        notes: parsed.notes,
+        relatedType: parsed.data.relatedType,
+        relatedId: parsed.data.relatedId,
+        notes: parsed.data.notes,
       },
       select: {
         id: true,
@@ -130,22 +127,13 @@ export async function POST(
       },
     });
 
-    return NextResponse.json(followup, {
-      status: 201,
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: "Invalid payload", issues: error.issues },
-        { status: 400, headers: { "Cache-Control": "no-store" } }
-      );
+    return ok(followup, 201);
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
 
     console.error("POST /api/vendors/[id]/followups", params.id, error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

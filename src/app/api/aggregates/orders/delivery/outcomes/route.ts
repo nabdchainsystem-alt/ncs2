@@ -2,9 +2,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET() {
   try {
@@ -39,15 +38,12 @@ export async function GET() {
       }
     });
 
-    return NextResponse.json(
-      {
-        labels: ["On-Time", "Delayed"],
-        data: [onTime, delayed],
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      labels: ["On-Time", "Delayed"],
+      data: [onTime, delayed],
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/delivery/outcomes", error);
-    return NextResponse.json({ labels: ["On-Time", "Delayed"], data: [0, 0] }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 const DEFAULT_LIMIT = 10;
 
@@ -93,15 +93,12 @@ export async function GET(request: Request) {
       })
     );
 
-    return NextResponse.json(
-      {
-        rows,
-        currency: "SAR",
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      rows,
+      currency: "SAR",
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/spend/top-materials", error);
-    return NextResponse.json({ rows: [], currency: "SAR" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

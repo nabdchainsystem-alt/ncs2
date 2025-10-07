@@ -2,12 +2,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
 import { parsePaginationParams, PageDto } from "@/lib/api/pagination";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const createVendorSchema = z.object({
   nameEn: z.string().min(1),
@@ -29,8 +29,6 @@ const createVendorSchema = z.object({
   iban: z.string().optional(),
   companyNumber: z.string().optional(),
 });
-
-type VendorPayload = z.infer<typeof createVendorSchema>;
 
 const SORTABLE_FIELDS = new Set([
   "nameEn",
@@ -54,44 +52,44 @@ const listSelect = {
 type VendorListRow = Prisma.VendorGetPayload<{ select: typeof listSelect }>;
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const { page, pageSize, search, sortField, sortDirection } = parsePaginationParams(url);
-  const statusParam = url.searchParams.get("status")?.trim();
-  const categoryParam = url.searchParams.get("category")?.trim();
-
-  const skip = (page - 1) * pageSize;
-
-  const whereAnd: Prisma.VendorWhereInput[] = [];
-
-  if (search) {
-    whereAnd.push({
-      OR: [
-        { nameEn: { contains: search, mode: "insensitive" } },
-        { category: { contains: search, mode: "insensitive" } },
-        { contactPerson: { contains: search, mode: "insensitive" } },
-        { phone: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-      ],
-    });
-  }
-
-  if (statusParam && (statusParam === "Active" || statusParam === "Inactive")) {
-    whereAnd.push({ status: statusParam });
-  }
-
-  if (categoryParam) {
-    whereAnd.push({ category: { equals: categoryParam } });
-  }
-
-  const where = whereAnd.length ? { AND: whereAnd } : undefined;
-
-  const sortableField = sortField && SORTABLE_FIELDS.has(sortField) ? sortField : undefined;
-
-  const orderBy: Prisma.VendorOrderByWithRelationInput = sortableField
-    ? { [sortableField]: sortDirection ?? "asc" }
-    : { createdAt: "desc" };
-
   try {
+    const url = new URL(request.url);
+    const { page, pageSize, search, sortField, sortDirection } = parsePaginationParams(url);
+    const statusParam = url.searchParams.get("status")?.trim();
+    const categoryParam = url.searchParams.get("category")?.trim();
+
+    const skip = (page - 1) * pageSize;
+
+    const whereAnd: Prisma.VendorWhereInput[] = [];
+
+    if (search) {
+      whereAnd.push({
+        OR: [
+          { nameEn: { contains: search, mode: "insensitive" } },
+          { category: { contains: search, mode: "insensitive" } },
+          { contactPerson: { contains: search, mode: "insensitive" } },
+          { phone: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+        ],
+      });
+    }
+
+    if (statusParam && (statusParam === "Active" || statusParam === "Inactive")) {
+      whereAnd.push({ status: statusParam });
+    }
+
+    if (categoryParam) {
+      whereAnd.push({ category: { equals: categoryParam } });
+    }
+
+    const where = whereAnd.length ? { AND: whereAnd } : undefined;
+
+    const sortableField = sortField && SORTABLE_FIELDS.has(sortField) ? sortField : undefined;
+
+    const orderBy: Prisma.VendorOrderByWithRelationInput = sortableField
+      ? { [sortableField]: sortDirection ?? "asc" }
+      : { createdAt: "desc" };
+
     const [records, total] = await Promise.all([
       prisma.vendor.findMany({
         skip,
@@ -110,20 +108,22 @@ export async function GET(request: Request) {
       pageSize,
     };
 
-    return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
+    return ok(payload);
+  } catch (error: any) {
     console.error("GET /api/vendors", error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const json = await request.json();
-    const data = createVendorSchema.parse(json);
+    const body = await readJson(request);
+    const parsed = createVendorSchema.safeParse(body);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
+
+    const data = parsed.data;
 
     const vendor = await prisma.vendor.create({
       data: {
@@ -134,29 +134,16 @@ export async function POST(request: Request) {
       select: listSelect,
     });
 
-    return NextResponse.json(vendor, {
-      status: 201,
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: "Invalid payload", issues: error.issues },
-        { status: 400, headers: { "Cache-Control": "no-store" } }
-      );
+    return ok(vendor, 201);
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
-
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json(
-        { message: "Vendor already exists" },
-        { status: 409, headers: { "Cache-Control": "no-store" } }
-      );
+      return fail(409, "Vendor already exists");
     }
 
     console.error("POST /api/vendors", error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { ApprovalStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const approvalSchema = z.object({
   approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]),
@@ -16,8 +16,12 @@ type RouteContext = { params: { id: string } };
 
 export async function PATCH(request: Request, { params }: RouteContext) {
   try {
-    const json = await request.json();
-    const { approvalStatus } = approvalSchema.parse(json);
+    const json = await readJson(request);
+    const parsed = approvalSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
+    const { approvalStatus } = parsed.data;
 
     await prisma.$transaction(async (tx) => {
       const updated = await tx.request.update({
@@ -47,17 +51,17 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       });
     });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload", issues: error.issues }, { status: 400 });
+    return ok({ success: true });
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return NextResponse.json({ message: "Request not found" }, { status: 404 });
+      return fail(404, "Request not found");
     }
 
     console.error("PATCH /api/requests/", params.id, "/approval", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

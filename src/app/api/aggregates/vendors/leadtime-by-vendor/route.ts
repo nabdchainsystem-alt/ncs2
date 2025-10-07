@@ -2,9 +2,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 const MS_IN_DAY = 1000 * 60 * 60 * 24;
 
@@ -47,15 +46,12 @@ export async function GET() {
 
     rows.sort((a, b) => a.avg - b.avg);
 
-    return NextResponse.json(
-      {
-        labels: rows.map((row) => row.name),
-        data: rows.map((row) => row.avg),
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      labels: rows.map((row) => row.name),
+      data: rows.map((row) => row.avg),
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/vendors/leadtime-by-vendor", error);
-    return NextResponse.json({ labels: [], data: [] }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

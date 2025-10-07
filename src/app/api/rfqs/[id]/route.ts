@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function DELETE(
   _request: Request,
@@ -33,16 +33,16 @@ export async function DELETE(
       });
     });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
+    return ok({ success: true });
+  } catch (error: any) {
     if (
       (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") ||
-      (error as any)?.code === "NOT_FOUND"
+      error?.code === "NOT_FOUND"
     ) {
-      return NextResponse.json({ message: "RFQ not found" }, { status: 404 });
+      return fail(404, "RFQ not found");
     }
 
     console.error("DELETE /api/rfqs/", params.id, error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

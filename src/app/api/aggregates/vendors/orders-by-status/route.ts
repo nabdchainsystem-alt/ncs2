@@ -2,11 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
 
 import { orderStatusesBuckets } from "../utils";
+import { ok, fail } from "@/server/api-helpers";
 
 const LABELS = ["Open", "Closed", "Cancelled"] as const;
 
@@ -28,15 +27,12 @@ export async function GET() {
       counts[bucket] += entry._count._all;
     });
 
-    return NextResponse.json(
-      {
-        labels: [...LABELS],
-        data: LABELS.map((label) => counts[label]),
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      labels: [...LABELS],
+      data: LABELS.map((label) => counts[label]),
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/vendors/orders-by-status", error);
-    return NextResponse.json({ labels: [...LABELS], data: LABELS.map(() => 0) }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

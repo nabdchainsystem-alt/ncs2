@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const createSchema = z.object({
   title: z.string().min(1),
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json(
+    return ok(
       followUps.map((task) => ({
         id: task.id,
         title: task.title,
@@ -61,25 +61,27 @@ export async function GET(request: Request) {
         requestCode: task.request?.code ?? null,
         requestPriority: task.request?.priority ?? null,
       })),
-      { headers: { "Cache-Control": "no-store" } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("GET /api/requests/follow-ups", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const json = await request.json();
-    const parsed = createSchema.parse(json);
+    const json = await readJson(request);
+    const parsed = createSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
 
-    const dueDate = new Date(parsed.dueDate);
+    const dueDate = new Date(parsed.data.dueDate);
 
-    let requestId: string | null = parsed.requestId || null;
-    if (!requestId && parsed.requestCode) {
+    let requestId: string | null = parsed.data.requestId || null;
+    if (!requestId && parsed.data.requestCode) {
       const matched = await prisma.request.findUnique({
-        where: { code: parsed.requestCode },
+        where: { code: parsed.data.requestCode },
         select: { id: true },
       });
       if (matched) {
@@ -89,10 +91,10 @@ export async function POST(request: Request) {
 
     const created = await prisma.requestFollowUp.create({
       data: {
-        title: parsed.title.trim(),
-        notes: parsed.notes?.trim() || null,
+        title: parsed.data.title.trim(),
+        notes: parsed.data.notes?.trim() || null,
         dueDate,
-        priority: parsed.priority ?? "Normal",
+        priority: parsed.data.priority ?? "Normal",
         requestId,
       },
       include: {
@@ -110,7 +112,7 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json(
+    return ok(
       {
         id: created.id,
         title: created.title,
@@ -122,14 +124,14 @@ export async function POST(request: Request) {
         requestCode: created.request?.code ?? null,
         requestPriority: created.request?.priority ?? null,
       },
-      { status: 201 }
+      201
     );
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload", issues: error.issues }, { status: 400 });
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
 
     console.error("POST /api/requests/follow-ups", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

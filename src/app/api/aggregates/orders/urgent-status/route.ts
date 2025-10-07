@@ -2,9 +2,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { computeUrgentStatusSeries } from "../_utils/urgent";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET(request: Request) {
   try {
@@ -15,23 +14,9 @@ export async function GET(request: Request) {
         ? periodParam
         : "monthly";
     const payload = await computeUrgentStatusSeries(period);
-    return NextResponse.json(payload, {
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
+    return ok(payload);
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/urgent-status", error);
-    return NextResponse.json(
-      {
-        labels: [],
-        series: [
-          { name: "Total", data: [] },
-          { name: "Over SLA", data: [] },
-          { name: "Within SLA", data: [] },
-          { name: "Completed", data: [] },
-          { name: "Pending", data: [] },
-        ],
-      },
-      { status: 500 }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

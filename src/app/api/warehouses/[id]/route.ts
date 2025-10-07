@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const updateSchema = z
   .object({
@@ -24,31 +24,41 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const json = await request.json();
-    const data = updateSchema.parse(json);
+    const json = await readJson(request);
+    const parsed = updateSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
+
+    const data = parsed.data;
 
     const warehouse = await prisma.warehouse.update({
       where: { id: params.id },
-      data,
+      data: {
+        ...(data.name ? { name: data.name } : {}),
+        ...(data.code ? { code: data.code } : {}),
+        ...(data.location !== undefined ? { location: data.location } : {}),
+        ...(data.sizeM2 !== undefined ? { sizeM2: data.sizeM2 } : {}),
+      },
     });
 
-    return NextResponse.json(warehouse);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload", issues: error.issues }, { status: 400 });
+    return ok(warehouse);
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
-        return NextResponse.json({ message: "Warehouse code must be unique" }, { status: 409 });
+        return fail(409, "Warehouse code must be unique");
       }
       if (error.code === "P2025") {
-        return NextResponse.json({ message: "Warehouse not found" }, { status: 404 });
+        return fail(404, "Warehouse not found");
       }
     }
 
     console.error("PATCH /api/warehouses/", params.id, error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }
 
@@ -58,13 +68,13 @@ export async function DELETE(
 ) {
   try {
     await prisma.warehouse.delete({ where: { id: params.id } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
+    return ok({ success: true });
+  } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return NextResponse.json({ message: "Warehouse not found" }, { status: 404 });
+      return fail(404, "Warehouse not found");
     }
 
     console.error("DELETE /api/warehouses/", params.id, error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

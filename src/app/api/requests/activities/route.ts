@@ -2,9 +2,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET() {
   try {
@@ -23,7 +22,7 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json(
+    return ok(
       activities.map((activity) => ({
         id: activity.id,
         requestId: activity.requestId,
@@ -34,10 +33,9 @@ export async function GET() {
         detail: activity.detail,
         createdAt: activity.createdAt,
       })),
-      { headers: { "Cache-Control": "no-store" } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("GET /api/requests/activities", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

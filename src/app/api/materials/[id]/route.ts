@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const updateSchema = z
   .object({
@@ -26,8 +26,13 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const json = await request.json();
-    const data = updateSchema.parse(json);
+    const json = await readJson(request);
+    const parsed = updateSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
+
+    const data = parsed.data;
 
     if (typeof data.warehouseId === "string" && data.warehouseId.length > 0) {
       const warehouseExists = await prisma.warehouse.findUnique({
@@ -35,7 +40,7 @@ export async function PATCH(
         select: { id: true },
       });
       if (!warehouseExists) {
-        return NextResponse.json({ message: "Warehouse not found" }, { status: 400 });
+        return fail(400, "Warehouse not found");
       }
     }
 
@@ -58,27 +63,27 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(material);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload", issues: error.issues }, { status: 400 });
+    return ok(material);
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
         const target = Array.isArray(error.meta?.target) ? error.meta?.target.join(",") : error.meta?.target;
         if (typeof target === "string" && target.includes("name")) {
-          return NextResponse.json({ message: "Material name must be unique" }, { status: 409 });
+          return fail(409, "Material name must be unique");
         }
-        return NextResponse.json({ message: "Material code must be unique" }, { status: 409 });
+        return fail(409, "Material code must be unique");
       }
       if (error.code === "P2025") {
-        return NextResponse.json({ message: "Material not found" }, { status: 404 });
+        return fail(404, "Material not found");
       }
     }
 
     console.error("PATCH /api/materials/", params.id, error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }
 
@@ -88,13 +93,13 @@ export async function DELETE(
 ) {
   try {
     await prisma.material.delete({ where: { id: params.id } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
+    return ok({ success: true });
+  } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return NextResponse.json({ message: "Material not found" }, { status: 404 });
+      return fail(404, "Material not found");
     }
 
     console.error("DELETE /api/materials/", params.id, error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

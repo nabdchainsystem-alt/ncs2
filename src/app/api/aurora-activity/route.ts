@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
 import { buildBoundaries, type Bucket } from "@/server/dateBuckets";
+import { ok, fail } from "@/server/api-helpers";
 
 const SIGNAL_ORDER = ["New", "Pending", "Approved", "Closed"] as const;
 
@@ -241,11 +241,15 @@ async function buildOrdersAggregation(boundaries: ReturnType<typeof buildBoundar
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const parsed = querySchema.parse({
+    const parsedResult = querySchema.safeParse({
       entity: url.searchParams.get("entity") ?? undefined,
       bucket: url.searchParams.get("bucket") ?? undefined,
       span: url.searchParams.get("span") ?? undefined,
     });
+    if (!parsedResult.success) {
+      return fail(400, "Validation error", parsedResult.error.flatten().fieldErrors);
+    }
+    const parsed = parsedResult.data;
 
     const bucket = parsed.bucket as Bucket;
     const span = parsed.span ?? DEFAULT_SPAN[bucket];
@@ -271,7 +275,7 @@ export async function GET(request: Request) {
         meta: emptyMeta,
       };
 
-      return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
+      return ok(payload);
     }
 
     const aggregation =
@@ -301,12 +305,9 @@ export async function GET(request: Request) {
       meta,
     };
 
-    return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
+    return ok(payload);
+  } catch (error: any) {
     console.error("GET /api/aurora-activity", error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid parameters", issues: error.issues }, { status: 400 });
-    }
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

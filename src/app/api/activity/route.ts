@@ -2,12 +2,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
 import { tableExists } from "@/server/db-utils";
 import { buildBoundaries, type Bucket } from "@/server/dateBuckets";
+import { ok, fail } from "@/server/api-helpers";
 
 type Kind = "requests" | "orders";
 
@@ -290,17 +290,14 @@ export async function GET(request: Request) {
     const bounds = buildBoundaries(bucket, span);
     const data = kind === "orders" ? await aggregateOrders(bounds) : await aggregateRequests(bounds);
 
-    return NextResponse.json(
-      {
-        kind,
-        bucket,
-        span,
-        data,
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      kind,
+      bucket,
+      span,
+      data,
+    });
+  } catch (error: any) {
     console.error("GET /api/activity", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 const CURRENCY = "SAR";
 const MS_IN_DAY = 1000 * 60 * 60 * 24;
@@ -114,19 +114,13 @@ export async function GET(
       };
     }
 
-    return NextResponse.json(
-      {
-        buckets,
-        list,
-        currency: CURRENCY,
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      buckets,
+      list,
+      currency: CURRENCY,
+    });
+  } catch (error: any) {
     console.error("GET /api/vendors/[id]/invoices", params.id, error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

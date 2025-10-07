@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma, RequestStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const statusSchema = z.object({
   status: z.enum(["OPEN", "PENDING", "CLOSED", "CANCELLED"]),
@@ -47,13 +47,13 @@ export async function GET(
     });
 
     if (!request) {
-      return NextResponse.json({ message: "Request not found" }, { status: 404 });
+      return fail(404, "Request not found");
     }
 
-    return NextResponse.json<RequestDetail>(request, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
+    return ok(request);
+  } catch (error: any) {
     console.error("GET /api/requests/", params.id, error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }
 
@@ -62,8 +62,12 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const json = await request.json();
-    const { status } = statusSchema.parse(json);
+    const json = await readJson(request);
+    const parsed = statusSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
+    const { status } = parsed.data;
 
     await prisma.$transaction(async (tx) => {
       const updated = await tx.request.update({
@@ -81,18 +85,18 @@ export async function PATCH(
       });
     });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload", issues: error.issues }, { status: 400 });
+    return ok({ success: true });
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return NextResponse.json({ message: "Request not found" }, { status: 404 });
+      return fail(404, "Request not found");
     }
 
     console.error("PATCH /api/requests/", params.id, error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }
 
@@ -124,16 +128,16 @@ export async function DELETE(
       await tx.request.delete({ where: { id: params.id } });
     });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
+    return ok({ success: true });
+  } catch (error: any) {
     if (
       (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") ||
-      (error as any)?.code === "NOT_FOUND"
+      error?.code === "NOT_FOUND"
     ) {
-      return NextResponse.json({ message: "Request not found" }, { status: 404 });
+      return fail(404, "Request not found");
     }
 
     console.error("DELETE /api/requests/", params.id, error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Priority } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const querySchema = z.object({
   from: z.string().optional(),
@@ -36,11 +36,16 @@ function parseDate(dateString: string | undefined, fallback: Date) {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const params = querySchema.parse({
+    const queryResult = querySchema.safeParse({
       from: url.searchParams.get("from") ?? undefined,
       to: url.searchParams.get("to") ?? undefined,
       status: url.searchParams.get("status") ?? undefined,
     });
+    if (!queryResult.success) {
+      return fail(400, "Validation error", queryResult.error.flatten().fieldErrors);
+    }
+
+    const params = queryResult.data;
 
     const now = new Date();
     const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -77,22 +82,22 @@ export async function GET(request: Request) {
       status: item.status,
     }));
 
-    return NextResponse.json(response, {
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
+    return ok(response);
+  } catch (error: any) {
     console.error("GET /api/orders/followups", error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid query" }, { status: 400 });
-    }
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
-    const data = createSchema.parse(payload);
+    const payload = await readJson(request);
+    const parsed = createSchema.safeParse(payload);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
+
+    const data = parsed.data;
 
     let purchaseOrderId: string | null = null;
 
@@ -102,7 +107,7 @@ export async function POST(request: Request) {
         select: { id: true },
       });
       if (!order) {
-        return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+        return fail(404, "Purchase order not found");
       }
       purchaseOrderId = order.id;
     }
@@ -120,7 +125,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(
+    return ok(
       {
         id: created.id,
         title: created.title,
@@ -130,16 +135,16 @@ export async function POST(request: Request) {
         notes: created.notes ?? null,
         status: created.status,
       },
-      {
-        status: 201,
-        headers: { "Cache-Control": "no-store" },
-      }
+      201
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("POST /api/orders/followups", error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload" }, { status: 400 });
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    if (error instanceof z.ZodError) {
+      return fail(400, "Validation error", error.flatten().fieldErrors);
+    }
+    return fail(500, "Server error", error?.message);
   }
 }

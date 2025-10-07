@@ -2,11 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 const FALLBACK = {
   totalOrders: 0,
@@ -61,19 +60,14 @@ export async function GET() {
       }
     });
 
-    return NextResponse.json(
-      {
-        totalOrders,
-        openOrders,
-        closedOrders,
-        topSpendDept,
-      },
-      {
-        headers: { "Cache-Control": "no-store" },
-      }
-    );
-  } catch (error) {
+    return ok({
+      totalOrders,
+      openOrders,
+      closedOrders,
+      topSpendDept,
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/urgent-kpis", error);
-    return NextResponse.json(FALLBACK, { status: 500 });
+    return fail(500, "Server error", error?.message ?? FALLBACK);
   }
 }

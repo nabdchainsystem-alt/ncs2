@@ -2,11 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
 
 import { orderStatusesBuckets } from "../utils";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET() {
   try {
@@ -41,15 +40,12 @@ export async function GET() {
 
     rows.sort((a, b) => b.pct - a.pct);
 
-    return NextResponse.json(
-      {
-        labels: rows.map((row) => row.name),
-        data: rows.map((row) => row.pct),
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      labels: rows.map((row) => row.name),
+      data: rows.map((row) => row.pct),
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/vendors/ontime-by-vendor", error);
-    return NextResponse.json({ labels: [], data: [] }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

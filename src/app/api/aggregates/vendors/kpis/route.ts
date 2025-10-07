@@ -2,11 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
 
 import { CURRENCY, decimalToNumber, orderStatusesBuckets } from "../utils";
+import { ok, fail } from "@/server/api-helpers";
 
 const FALLBACK = {
   total: 0,
@@ -59,18 +58,15 @@ export async function GET() {
         )
       : 0;
 
-    return NextResponse.json(
-      {
-        total,
-        active,
-        monthlySpend: decimalToNumber(monthlySpendAgg._sum.total),
-        avgOnTimePct,
-        currency: CURRENCY,
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      total,
+      active,
+      monthlySpend: decimalToNumber(monthlySpendAgg._sum.total),
+      avgOnTimePct,
+      currency: CURRENCY,
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/vendors/kpis", error);
-    return NextResponse.json(FALLBACK, { status: 500 });
+    return fail(500, "Server error", error?.message ?? FALLBACK);
   }
 }

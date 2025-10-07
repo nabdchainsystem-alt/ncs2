@@ -2,12 +2,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma, RequestStatus, Priority } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
 import { parsePaginationParams, PageDto } from "@/lib/api/pagination";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 type RequestRowRecord = Prisma.RequestGetPayload<{
   include: {
@@ -47,125 +47,130 @@ const PRIORITY_VALUES = new Set(Object.values(Priority));
 const STATUS_VALUES = new Set(Object.values(RequestStatus));
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const { page, pageSize, search, sortField, sortDirection } = parsePaginationParams(url);
-  const skip = (page - 1) * pageSize;
+  try {
+    const url = new URL(request.url);
+    const { page, pageSize, search, sortField, sortDirection } = parsePaginationParams(url);
+    const skip = (page - 1) * pageSize;
 
-  const statusParam = url.searchParams.get("status") || undefined;
-  const priorityParam = url.searchParams.get("priority") || undefined;
-  const departmentId = url.searchParams.get("dept") || undefined;
-  const warehouseId = url.searchParams.get("wh") || undefined;
-  const machineId = url.searchParams.get("machine") || undefined;
-  const vendorId = url.searchParams.get("vendor") || undefined;
+    const statusParam = url.searchParams.get("status") || undefined;
+    const priorityParam = url.searchParams.get("priority") || undefined;
+    const departmentId = url.searchParams.get("dept") || undefined;
+    const warehouseId = url.searchParams.get("wh") || undefined;
+    const machineId = url.searchParams.get("machine") || undefined;
+    const vendorId = url.searchParams.get("vendor") || undefined;
 
-  const whereAnd: Prisma.RequestWhereInput[] = [];
+    const whereAnd: Prisma.RequestWhereInput[] = [];
 
-  if (search) {
-    whereAnd.push({
-      OR: [
-        { code: { contains: search } },
-        { description: { contains: search } },
-        {
-          items: {
-            some: {
-              OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { material: { code: { contains: search, mode: "insensitive" } } },
-                { material: { name: { contains: search, mode: "insensitive" } } },
-              ],
+    if (search) {
+      whereAnd.push({
+        OR: [
+          { code: { contains: search } },
+          { description: { contains: search } },
+          {
+            items: {
+              some: {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { material: { code: { contains: search, mode: "insensitive" } } },
+                  { material: { name: { contains: search, mode: "insensitive" } } },
+                ],
+              },
             },
           },
-        },
-      ],
-    });
-  }
+        ],
+      });
+    }
 
-  if (statusParam && STATUS_VALUES.has(statusParam as RequestStatus)) {
-    whereAnd.push({ status: statusParam as RequestStatus });
-  }
+    if (statusParam && STATUS_VALUES.has(statusParam as RequestStatus)) {
+      whereAnd.push({ status: statusParam as RequestStatus });
+    }
 
-  if (priorityParam && PRIORITY_VALUES.has(priorityParam as Priority)) {
-    whereAnd.push({ priority: priorityParam as Priority });
-  }
+    if (priorityParam && PRIORITY_VALUES.has(priorityParam as Priority)) {
+      whereAnd.push({ priority: priorityParam as Priority });
+    }
 
-  if (departmentId) {
-    whereAnd.push({ departmentId });
-  }
+    if (departmentId) {
+      whereAnd.push({ departmentId });
+    }
 
-  if (warehouseId) {
-    whereAnd.push({ warehouseId });
-  }
+    if (warehouseId) {
+      whereAnd.push({ warehouseId });
+    }
 
-  if (machineId) {
-    whereAnd.push({ machineId });
-  }
+    if (machineId) {
+      whereAnd.push({ machineId });
+    }
 
-  if (vendorId) {
-    whereAnd.push({ vendorId });
-  }
+    if (vendorId) {
+      whereAnd.push({ vendorId });
+    }
 
-  const where: Prisma.RequestWhereInput | undefined = whereAnd.length
-    ? { AND: whereAnd }
-    : undefined;
+    const where: Prisma.RequestWhereInput | undefined = whereAnd.length
+      ? { AND: whereAnd }
+      : undefined;
 
-  const sortableField = sortField && SORTABLE_FIELDS.has(sortField as keyof Prisma.RequestOrderByWithRelationInput)
-    ? (sortField as keyof Prisma.RequestOrderByWithRelationInput)
-    : undefined;
+    const sortableField = sortField && SORTABLE_FIELDS.has(sortField as keyof Prisma.RequestOrderByWithRelationInput)
+      ? (sortField as keyof Prisma.RequestOrderByWithRelationInput)
+      : undefined;
 
-  let orderBy: Prisma.RequestOrderByWithRelationInput = { createdAt: "desc" };
+    let orderBy: Prisma.RequestOrderByWithRelationInput = { createdAt: "desc" };
 
-  if (sortableField) {
-    orderBy = {
-      [sortableField]: sortDirection ?? "desc",
-    } satisfies Prisma.RequestOrderByWithRelationInput;
-  }
+    if (sortableField) {
+      orderBy = {
+        [sortableField]: sortDirection ?? "desc",
+      } satisfies Prisma.RequestOrderByWithRelationInput;
+    }
 
-  const [records, total] = await Promise.all([
-    prisma.request.findMany({
-      skip,
-      take: pageSize,
-      where,
-      orderBy,
-      include: {
-        department: { select: { id: true, name: true } },
-        warehouse: { select: { id: true, name: true } },
-        machine: { select: { id: true, name: true } },
-        vendor: { select: { id: true, nameEn: true } },
-        items: {
-          select: {
-            name: true,
-            unit: true,
-            qty: true,
-            material: { select: { code: true, name: true } },
+    const [records, total] = await Promise.all([
+      prisma.request.findMany({
+        skip,
+        take: pageSize,
+        where,
+        orderBy,
+        include: {
+          department: { select: { id: true, name: true } },
+          warehouse: { select: { id: true, name: true } },
+          machine: { select: { id: true, name: true } },
+          vendor: { select: { id: true, nameEn: true } },
+          items: {
+            select: {
+              name: true,
+              unit: true,
+              qty: true,
+              material: { select: { code: true, name: true } },
+            },
+            orderBy: { id: "asc" },
+            take: 1,
           },
-          orderBy: { id: "asc" },
-          take: 1,
+          _count: { select: { items: true } },
         },
-        _count: { select: { items: true } },
-      },
-    }),
-    prisma.request.count({ where }),
-  ]);
+      }),
+      prisma.request.count({ where }),
+    ]);
 
-  const rows: RequestRow[] = records.map(({ _count, items, ...rest }) => {
-    const primaryItem = items[0] ?? null;
+    const rows: RequestRow[] = records.map(({ _count, items, ...rest }) => {
+      const primaryItem = items[0] ?? null;
 
-    return {
-      ...rest,
-      itemsCount: _count.items,
-      primaryItemCode: primaryItem?.material?.code ?? null,
-      primaryItemName: primaryItem?.material?.name ?? primaryItem?.name ?? null,
-    } satisfies RequestRow;
-  });
+      return {
+        ...rest,
+        itemsCount: _count.items,
+        primaryItemCode: primaryItem?.material?.code ?? null,
+        primaryItemName: primaryItem?.material?.name ?? primaryItem?.name ?? null,
+      } satisfies RequestRow;
+    });
 
-  const payload: PageDto<RequestRow> = {
-    rows,
-    total,
-    page,
-    pageSize,
-  };
+    const payload: PageDto<RequestRow> = {
+      rows,
+      total,
+      page,
+      pageSize,
+    };
 
-  return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
+    return ok(payload);
+  } catch (error: any) {
+    console.error("GET /api/requests", error);
+    return fail(500, "Server error", error?.message);
+  }
 }
 
 const UNIT_VALUES = ["PC", "KG", "L", "Carton", "Pallet"] as const;
@@ -226,29 +231,47 @@ async function validateRelations(data: CreateRequestInput) {
 
 export async function POST(request: Request) {
   try {
-    const json = await request.json();
-    const parsed = createRequestSchema.parse(json);
+    const json = await readJson(request);
+    const parsed = createRequestSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
 
-    await validateRelations(parsed);
+    const data = parsed.data;
 
-    const code = parsed.code?.trim() || generateRequestCode();
+    try {
+      await validateRelations(data);
+    } catch (relationError) {
+      if (
+        relationError instanceof Prisma.PrismaClientKnownRequestError &&
+        relationError.code === "P2025"
+      ) {
+        return fail(404, "Related entity not found");
+      }
+      if (relationError instanceof Prisma.NotFoundError) {
+        return fail(404, "Related entity not found");
+      }
+      throw relationError;
+    }
+
+    const code = data.code?.trim() || generateRequestCode();
 
     const result = await prisma.$transaction(async (tx) => {
       const created = await tx.request.create({
         data: {
           code,
-          departmentId: parsed.departmentId || null,
-          warehouseId: parsed.warehouseId || null,
-          machineId: parsed.machineId || null,
-          vendorId: parsed.vendorId || null,
-          priority: parsed.priority,
-          neededBy: parsed.neededBy ? new Date(parsed.neededBy) : null,
-          description: parsed.description?.trim() || null,
+          departmentId: data.departmentId || null,
+          warehouseId: data.warehouseId || null,
+          machineId: data.machineId || null,
+          vendorId: data.vendorId || null,
+          priority: data.priority,
+          neededBy: data.neededBy ? new Date(data.neededBy) : null,
+          description: data.description?.trim() || null,
         },
       });
 
       await tx.requestItem.createMany({
-        data: parsed.items.map((item) => ({
+        data: data.items.map((item) => ({
           requestId: created.id,
           materialId: item.materialId ? item.materialId : null,
           name: item.materialId ? null : item.name?.trim() ?? null,
@@ -269,10 +292,10 @@ export async function POST(request: Request) {
       return created;
     });
 
-    return NextResponse.json({ id: result.id, code: result.code }, { status: 201 });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload", issues: error.issues }, { status: 400 });
+    return ok({ id: result.id, code: result.code }, 201);
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -281,15 +304,15 @@ export async function POST(request: Request) {
           ? (error.meta?.target as string[]).join(",")
           : (error.meta?.target as string | undefined);
         if (target && target.includes("code")) {
-          return NextResponse.json({ message: "Request code must be unique" }, { status: 409 });
+          return fail(409, "Request code must be unique");
         }
       }
       if (error.code === "P2025") {
-        return NextResponse.json({ message: "Related entity not found" }, { status: 400 });
+        return fail(404, "Related entity not found");
       }
     }
 
     console.error("POST /api/requests", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

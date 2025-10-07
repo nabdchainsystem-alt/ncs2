@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET() {
   try {
@@ -32,29 +32,16 @@ export async function GET() {
       spendSeries.push(Number(aggregate._sum.total ?? new Prisma.Decimal(0)));
     }
 
-    return NextResponse.json(
-      {
-        labels,
-        series: [
-          { name: "Orders", data: ordersSeries },
-          { name: "Spend (SAR)", data: spendSeries },
-        ],
-        currency: "SAR",
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      labels,
+      series: [
+        { name: "Orders", data: ordersSeries },
+        { name: "Spend (SAR)", data: spendSeries },
+      ],
+      currency: "SAR",
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/monthly-trend", error);
-    return NextResponse.json(
-      {
-        labels: [],
-        series: [
-          { name: "Orders", data: [] },
-          { name: "Spend (SAR)", data: [] },
-        ],
-        currency: "SAR",
-      },
-      { status: 500 }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

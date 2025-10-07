@@ -2,9 +2,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 function buildActivity(payload: Awaited<ReturnType<typeof prisma.purchaseOrder.findMany>>[number]) {
   const createdAt = payload.createdAt.getTime();
@@ -54,11 +53,9 @@ export async function GET(request: Request) {
 
     const activities = orders.map(buildActivity);
 
-    return NextResponse.json(activities, {
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
+    return ok(activities);
+  } catch (error: any) {
     console.error("GET /api/orders/activities", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

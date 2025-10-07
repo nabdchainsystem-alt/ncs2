@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET() {
   try {
@@ -34,16 +34,13 @@ export async function GET() {
       data.push(Number(row._sum.total ?? new Prisma.Decimal(0)));
     }
 
-    return NextResponse.json(
-      {
-        labels,
-        data,
-        currency: "SAR",
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      labels,
+      data,
+      currency: "SAR",
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/spend/vendors-distribution", error);
-    return NextResponse.json({ labels: [], data: [], currency: "SAR" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

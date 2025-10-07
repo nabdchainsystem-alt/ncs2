@@ -2,11 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
-
 import { prisma } from "@/server/db";
 
 import { CURRENCY, decimalToNumber, formatMonthLabel } from "../utils";
+import { ok, fail } from "@/server/api-helpers";
 
 function monthStart(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -54,27 +53,15 @@ export async function GET(request: Request) {
       }
     });
 
-    return NextResponse.json(
-      {
-        labels: buckets.map((bucket) => bucket.label),
-        series: [
-          { name: "Orders", data: buckets.map((bucket) => bucket.orders) },
-          { name: `Spend (${CURRENCY})`, data: buckets.map((bucket) => Number(bucket.spend.toFixed(2))) },
-        ],
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      labels: buckets.map((bucket) => bucket.label),
+      series: [
+        { name: "Orders", data: buckets.map((bucket) => bucket.orders) },
+        { name: `Spend (${CURRENCY})`, data: buckets.map((bucket) => Number(bucket.spend.toFixed(2))) },
+      ],
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/vendors/spend-by-month", error);
-    return NextResponse.json(
-      {
-        labels: [],
-        series: [
-          { name: "Orders", data: [] },
-          { name: `Spend (${CURRENCY})`, data: [] },
-        ],
-      },
-      { status: 500 }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

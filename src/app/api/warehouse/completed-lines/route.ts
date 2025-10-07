@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { TransferStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 const querySchema = z.object({
   status: z.enum(["pending", "processed"]).optional(),
@@ -16,10 +16,14 @@ const querySchema = z.object({
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const parsed = querySchema.parse({
+    const parsedResult = querySchema.safeParse({
       status: url.searchParams.get("status") ?? undefined,
       limit: url.searchParams.get("limit") ?? undefined,
     });
+    if (!parsedResult.success) {
+      return fail(400, "Validation error", parsedResult.error.flatten().fieldErrors);
+    }
+    const parsed = parsedResult.data;
 
     const where = parsed.status
       ? {
@@ -78,15 +82,9 @@ export async function GET(request: Request) {
       warehouseName: row.purchaseOrder?.rfq?.request?.warehouse?.name ?? null,
     }));
 
-    return NextResponse.json(
-      { count, rows: dto },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({ count, rows: dto });
+  } catch (error: any) {
     console.error("GET /api/warehouse/completed-lines", error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid query" }, { status: 400 });
-    }
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

@@ -2,9 +2,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { Prisma } from "@prisma/client";
+import { ok, fail } from "@/server/api-helpers";
 
 const CURRENCY = "SAR";
 
@@ -139,15 +139,9 @@ export async function GET(
 
     events.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    return NextResponse.json(
-      { rows: events.slice(0, take) },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({ rows: events.slice(0, take) });
+  } catch (error: any) {
     console.error("GET /api/vendors/[id]/activity", params.id, error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

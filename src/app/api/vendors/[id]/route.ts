@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const vendorSelect = {
   id: true,
@@ -71,10 +71,7 @@ export async function GET(
     const vendor = await prisma.vendor.findUnique({ where: { id }, select: vendorSelect });
 
     if (!vendor) {
-      return NextResponse.json(
-        { message: "Vendor not found" },
-        { status: 404, headers: { "Cache-Control": "no-store" } }
-      );
+      return fail(404, "Vendor not found");
     }
 
     const [purchaseOrdersByStatus, spendAgg, transfers] = await Promise.all([
@@ -124,13 +121,10 @@ export async function GET(
       },
     };
 
-    return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
+    return ok(payload);
+  } catch (error: any) {
     console.error("GET /api/vendors/[id]", params.id, error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }
 
@@ -139,40 +133,34 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const json = await request.json();
-    const parsed = updateSchema.parse(json);
+    const json = await readJson(request);
+    const parsed = updateSchema.safeParse(json);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
 
     const vendor = await prisma.vendor.update({
       where: { id: params.id },
       data: {
-        ...parsed,
-        crExpiry: parsed.crExpiry ? new Date(parsed.crExpiry) : undefined,
-        vatExpiry: parsed.vatExpiry ? new Date(parsed.vatExpiry) : undefined,
+        ...parsed.data,
+        crExpiry: parsed.data.crExpiry ? new Date(parsed.data.crExpiry) : undefined,
+        vatExpiry: parsed.data.vatExpiry ? new Date(parsed.data.vatExpiry) : undefined,
       },
       select: vendorSelect,
     });
 
-    return NextResponse.json(vendor, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: "Invalid payload", issues: error.issues },
-        { status: 400, headers: { "Cache-Control": "no-store" } }
-      );
+    return ok(vendor);
+  } catch (error: any) {
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
 
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return NextResponse.json(
-        { message: "Vendor not found" },
-        { status: 404, headers: { "Cache-Control": "no-store" } }
-      );
+      return fail(404, "Vendor not found");
     }
 
     console.error("PATCH /api/vendors/", params.id, error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }
 
@@ -182,19 +170,13 @@ export async function DELETE(
 ) {
   try {
     await prisma.vendor.delete({ where: { id: params.id } });
-    return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
+    return ok({ success: true });
+  } catch (error: any) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-      return NextResponse.json(
-        { message: "Vendor not found" },
-        { status: 404, headers: { "Cache-Control": "no-store" } }
-      );
+      return fail(404, "Vendor not found");
     }
 
     console.error("DELETE /api/vendors/", params.id, error);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

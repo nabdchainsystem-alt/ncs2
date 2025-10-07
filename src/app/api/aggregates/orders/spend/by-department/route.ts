@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET() {
   try {
@@ -55,27 +55,15 @@ export async function GET() {
 
     const topDepartmentPct = grandTotal.isZero() ? 0 : Number(topValue.div(grandTotal).mul(100));
 
-    return NextResponse.json(
-      {
-        labels,
-        data,
-        topDepartment,
-        topDepartmentPct,
-        currency: "SAR",
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      labels,
+      data,
+      topDepartment,
+      topDepartmentPct,
+      currency: "SAR",
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/spend/by-department", error);
-    return NextResponse.json(
-      {
-        labels: [],
-        data: [],
-        topDepartment: "—",
-        topDepartmentPct: 0,
-        currency: "SAR",
-      },
-      { status: 500 }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }

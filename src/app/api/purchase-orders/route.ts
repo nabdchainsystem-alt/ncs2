@@ -2,11 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma, Priority } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/server/db";
+import { ok, fail, readJson } from "@/server/api-helpers";
 
 const sortSchema = z
   .string()
@@ -40,7 +40,7 @@ function parseSort(sort?: string) {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const parsed = querySchema.parse({
+    const parsed = querySchema.safeParse({
       page: url.searchParams.get("page"),
       pageSize: url.searchParams.get("pageSize"),
       search: url.searchParams.get("search") ?? undefined,
@@ -48,8 +48,11 @@ export async function GET(request: Request) {
       vendor: url.searchParams.get("vendor") || undefined,
       sort: url.searchParams.get("sort") || undefined,
     });
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten().fieldErrors);
+    }
 
-    const { page, pageSize, search, status, vendor, sort } = parsed;
+    const { page, pageSize, search, status, vendor, sort } = parsed.data;
     const { field, direction } = parseSort(sort);
 
     const where: Prisma.PurchaseOrderWhereInput = {
@@ -137,23 +140,15 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json(
-      {
-        rows: rowsDto,
-        total,
-        page,
-        pageSize,
-      },
-      {
-        headers: { "Cache-Control": "no-store" },
-      }
-    );
-  } catch (error) {
+    return ok({
+      rows: rowsDto,
+      total,
+      page,
+      pageSize,
+    });
+  } catch (error: any) {
     console.error("GET /api/purchase-orders", error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid query", issues: error.message }, { status: 400 });
-    }
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }
 
@@ -197,8 +192,12 @@ function formatPoNumber(seq: number) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const data = createSchema.parse(body);
+    const body = await readJson(request);
+    const parsed = createSchema.safeParse(body);
+    if (!parsed.success) {
+      return fail(400, "Validation error", parsed.error.flatten());
+    }
+    const data = parsed.data;
 
     const [rfq, vendor] = await Promise.all([
       prisma.rFQ.findUnique({
@@ -211,15 +210,15 @@ export async function POST(request: Request) {
     ]);
 
     if (!rfq) {
-      return NextResponse.json({ message: "RFQ not found" }, { status: 404 });
+      return fail(404, "RFQ not found");
     }
 
     if (!vendor) {
-      return NextResponse.json({ message: "Vendor not found" }, { status: 404 });
+      return fail(404, "Vendor not found");
     }
 
     if (rfq.vendorId !== data.vendorId) {
-      return NextResponse.json({ message: "RFQ belongs to a different vendor" }, { status: 400 });
+      return fail(400, "RFQ belongs to a different vendor");
     }
 
     const vatPctDecimal = new Prisma.Decimal(data.vatPct);
@@ -288,23 +287,17 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json(created, {
-      status: 201,
-      headers: { "Cache-Control": "no-store" },
-    });
-  } catch (error) {
+    return ok(created, 201);
+  } catch (error: any) {
     console.error("POST /api/purchase-orders", error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid payload", issues: error.flatten() }, { status: 400 });
+    if (error?.message === "INVALID_CONTENT_TYPE") {
+      return fail(415, "Content-Type must be application/json");
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2003") {
-        return NextResponse.json(
-          { message: "Related record not found. Confirm the RFQ and vendor are valid." },
-          { status: 400 }
-        );
+        return fail(400, "Related record not found. Confirm the RFQ and vendor are valid.");
       }
     }
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

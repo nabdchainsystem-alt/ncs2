@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 export async function GET() {
   try {
@@ -57,9 +57,9 @@ export async function GET() {
           : data.delayTotal / Math.max(1, data.deliveries - data.onTime),
     }));
 
-    return NextResponse.json({ rows }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
+    return ok({ rows });
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/delivery/summary", error);
-    return NextResponse.json({ rows: [] }, { status: 500 });
+    return fail(500, "Server error", error?.message);
   }
 }

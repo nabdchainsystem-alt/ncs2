@@ -2,10 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/server/db";
+import { ok, fail } from "@/server/api-helpers";
 
 function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -54,20 +54,14 @@ export async function GET() {
     const previousSpend = Number(lastMonthOrders._sum.total ?? new Prisma.Decimal(0));
     const changePct = previousSpend === 0 ? 100 : ((spendThisMonth - previousSpend) / previousSpend) * 100;
 
-    return NextResponse.json(
-      {
-        totalOrders,
-        spendThisMonth,
-        changePct,
-        currency: "SAR",
-      },
-      { headers: { "Cache-Control": "no-store" } }
-    );
-  } catch (error) {
+    return ok({
+      totalOrders,
+      spendThisMonth,
+      changePct,
+      currency: "SAR",
+    });
+  } catch (error: any) {
     console.error("GET /api/aggregates/orders/monthly-cards", error);
-    return NextResponse.json(
-      { totalOrders: 0, spendThisMonth: 0, changePct: 0, currency: "SAR" },
-      { status: 500 }
-    );
+    return fail(500, "Server error", error?.message);
   }
 }
