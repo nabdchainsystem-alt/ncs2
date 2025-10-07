@@ -5,6 +5,7 @@ import React from "react";
 import Script from "next/script";
 import { Roboto } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
+import FabRadial from "@/components/common/FabRadial";
 import theme from "@/theme";
 import { MaterialTailwindControllerProvider } from "@/context";
 import InnerContent from "./content";
@@ -43,6 +44,15 @@ export default function RootLayout({
             <InnerContent>{children}</InnerContent>
           </MaterialTailwindControllerProvider>
         </ThemeProvider>
+        {/* Global floating FAB available on all pages */}
+        <FabRadial
+          onCreateRequest={() => {
+            if (typeof window !== "undefined") {
+              window.location.href = "/supply-chain/requests/new";
+            }
+          }}
+          hideOnPaths={["/login", "/auth", "/print"]}
+        />
       </body>
     </html>
   );

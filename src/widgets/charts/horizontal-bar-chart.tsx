@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 // deepmerge
@@ -15,7 +15,7 @@ type PropTypes = {
   colors?: string | string[];
   options?: {};
 };
-export function HorizontalBarChart({
+const HorizontalBarChartComponent = memo(function HorizontalBarChart({
   height = 350,
   series,
   colors,
@@ -35,6 +35,9 @@ export function HorizontalBarChart({
             },
             zoom: {
               enabled: false,
+            },
+            animations: {
+              enabled: true,
             },
           },
           title: {
@@ -116,7 +119,11 @@ export function HorizontalBarChart({
   );
 
   return (
-    <div ref={containerRef} className="tw-w-full">
+    <div
+      ref={containerRef}
+      className="tw-w-full tw-min-h-[300px]"
+      style={{ minHeight: Math.max(height, 300) }}
+    >
       {ready ? (
         <ReactApexChart
           type="bar"
@@ -126,15 +133,15 @@ export function HorizontalBarChart({
           options={chartOptions as any}
         />
       ) : (
-        <div
-          className="tw-grid tw-w-full tw-place-items-center tw-text-blue-gray-300"
-          style={{ height }}
-        >
+        <div className="tw-flex tw-h-full tw-w-full tw-items-center tw-justify-center tw-text-blue-gray-300">
           Loading chart…
         </div>
       )}
     </div>
   );
-}
+});
 
-export default HorizontalBarChart;
+HorizontalBarChartComponent.displayName = "HorizontalBarChart";
+
+export const HorizontalBarChart = HorizontalBarChartComponent;
+export default HorizontalBarChartComponent;

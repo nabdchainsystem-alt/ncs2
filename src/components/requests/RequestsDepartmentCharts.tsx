@@ -56,7 +56,7 @@ function RangeToggle({ value, onChange }: RangeToggleProps) {
                 onChange(option.value);
               }
             }}
-            className={`tw-rounded-full tw-px-3 tw-py-1.5 tw-text-xs tw-font-semibold tw-uppercase tw-transition-colors focus:tw-outline-none focus:tw-ring-2 focus:tw-ring-amber-500 focus:tw-ring-offset-2 ${
+            className={`tw-rounded-full tw-px-3 tw-py-1.5 tw-text-xs tw-font-semibold tw-uppercase focus:tw-outline-none focus:tw-ring-2 focus:tw-ring-amber-500 focus:tw-ring-offset-2 ${
               isActive
                 ? "tw-bg-gray-900 tw-text-white"
                 : "tw-text-blue-gray-500 hover:tw-text-blue-gray-700"
@@ -147,7 +147,12 @@ export default function RequestsDepartmentCharts() {
   const { data, error, isLoading } = useSWR<DepartmentActivityResponse>(
     "/api/requests/analytics/department-activity",
     fetcher,
-    { refreshInterval: 60_000 }
+    {
+      refreshInterval: 60_000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const [totalRange, setTotalRange] = useState<RangeValue>("weekly");

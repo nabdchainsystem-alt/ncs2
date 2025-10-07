@@ -72,7 +72,12 @@ export function useOrdersUrgent(period: "daily" | "weekly" | "monthly" = "monthl
     mutate: mutateKpis,
   } = useSWR<UrgentKpisResponse>(
     "/api/aggregates/orders/urgent-kpis",
-    (url) => fetchJson(url, DEFAULT_KPIS)
+    (url) => fetchJson(url, DEFAULT_KPIS),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const {
@@ -82,7 +87,12 @@ export function useOrdersUrgent(period: "daily" | "weekly" | "monthly" = "monthl
     mutate: mutateStatus,
   } = useSWR<UrgentStatusResponse>(
     `/api/aggregates/orders/urgent-status?period=${period}`,
-    (url) => fetchJson(url, DEFAULT_STATUS)
+    (url) => fetchJson(url, DEFAULT_STATUS),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const {
@@ -92,7 +102,12 @@ export function useOrdersUrgent(period: "daily" | "weekly" | "monthly" = "monthl
     mutate: mutateByDept,
   } = useSWR<UrgentByDeptResponse>(
     "/api/aggregates/orders/spend/by-department",
-    (url) => fetchJson(url, DEFAULT_BY_DEPT)
+    (url) => fetchJson(url, DEFAULT_BY_DEPT),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const mutate = useCallback(() => {

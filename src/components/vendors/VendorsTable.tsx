@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   Alert,
@@ -22,13 +22,38 @@ import {
   MenuList,
   Typography,
 } from "@/components/MaterialTailwind";
-import { EllipsisHorizontalIcon, PencilSquareIcon, EyeIcon, ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import PageSizeSelect from "@/components/common/PageSizeSelect";
+import {
+  ArrowsRightLeftIcon,
+  ChevronDownIcon,
+  ChevronUpDownIcon,
+  ChevronUpIcon,
+  EllipsisHorizontalIcon,
+  EyeIcon,
+  PencilSquareIcon,
+} from "@heroicons/react/24/outline";
 
 import VendorProfileDrawer from "./VendorProfileDrawer";
 import type { VendorFilters } from "./VendorFiltersBar";
 import { useVendors, type VendorListRow } from "@/hooks/vendors";
 
-const TABLE_HEADERS = ["Name", "Category", "Contact", "Phone", "Email", "Status", "Actions"] as const;
+type SortField = "nameEn" | "category" | "contactPerson" | "phone" | "email" | "status";
+
+type ColumnConfig = {
+  key: string;
+  label: string;
+  sortField?: SortField;
+};
+
+const TABLE_COLUMNS: ColumnConfig[] = [
+  { key: "name", label: "Name", sortField: "nameEn" },
+  { key: "category", label: "Category", sortField: "category" },
+  { key: "contact", label: "Contact", sortField: "contactPerson" },
+  { key: "phone", label: "Phone", sortField: "phone" },
+  { key: "email", label: "Email", sortField: "email" },
+  { key: "status", label: "Status", sortField: "status" },
+  { key: "actions", label: "Actions" },
+];
 
 const STATUS_COLORS: Record<string, "green" | "blue-gray" | "amber"> = {
   Active: "green",
@@ -55,8 +80,9 @@ const initialEditState: EditFormState = {
 
 export default function VendorsTable({ filters }: Props) {
   const [page, setPage] = useState(1);
-  const pageSize = 10;
-  const [sort] = useState("nameEn:asc");
+  const [pageSize, setPageSize] = useState<number>(5);
+  const [sortField, setSortField] = useState<SortField>("nameEn");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [drawerVendorId, setDrawerVendorId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<VendorListRow | null>(null);
@@ -64,6 +90,8 @@ export default function VendorsTable({ filters }: Props) {
   const [editError, setEditError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  const sort = `${sortField}:${sortDirection}` as const;
 
   const apiFilters = useMemo(() => {
     const status =
@@ -88,6 +116,37 @@ export default function VendorsTable({ filters }: Props) {
   useEffect(() => {
     setPage(1);
   }, [filters.search, filters.status, filters.category]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+  }, []);
+
+  const handleSort = useCallback((field: SortField) => {
+    setPage(1);
+    setSortField((prevField) => {
+      if (prevField === field) {
+        setSortDirection((prevDirection) => (prevDirection === "asc" ? "desc" : "asc"));
+        return prevField;
+      }
+      setSortDirection("asc");
+      return field;
+    });
+  }, []);
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ChevronUpDownIcon className="tw-h-4 tw-w-4 tw-text-blue-gray-300" />;
+    }
+    return sortDirection === "asc" ? (
+      <ChevronUpIcon className="tw-h-4 tw-w-4 tw-text-blue-gray-500" />
+    ) : (
+      <ChevronDownIcon className="tw-h-4 tw-w-4 tw-text-blue-gray-500" />
+    );
+  };
 
   const rows = data?.rows ?? [];
   const total = data?.total ?? 0;
@@ -175,7 +234,7 @@ export default function VendorsTable({ filters }: Props) {
     if (isLoading) {
       return (
         <tr>
-          <td className="tw-px-6 tw-py-10 tw-text-center tw-text-blue-gray-400" colSpan={TABLE_HEADERS.length}>
+          <td className="tw-px-6 tw-py-10 tw-text-center tw-text-blue-gray-400" colSpan={TABLE_COLUMNS.length}>
             Loading vendors…
           </td>
         </tr>
@@ -185,7 +244,7 @@ export default function VendorsTable({ filters }: Props) {
     if (isError) {
       return (
         <tr>
-          <td className="tw-px-6 tw-py-10" colSpan={TABLE_HEADERS.length}>
+          <td className="tw-px-6 tw-py-10" colSpan={TABLE_COLUMNS.length}>
             <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
               {error instanceof Error ? error.message : "Unable to load vendors"}
             </Typography>
@@ -197,7 +256,7 @@ export default function VendorsTable({ filters }: Props) {
     if (!rows.length) {
       return (
         <tr>
-          <td className="tw-px-6 tw-py-10 tw-text-center tw-text-blue-gray-400" colSpan={TABLE_HEADERS.length}>
+          <td className="tw-px-6 tw-py-10 tw-text-center tw-text-blue-gray-400" colSpan={TABLE_COLUMNS.length}>
             No vendors match the current filters.
           </td>
         </tr>
@@ -289,13 +348,37 @@ export default function VendorsTable({ filters }: Props) {
           <table className="tw-min-w-full tw-table-auto">
             <thead>
               <tr className="tw-border-b tw-border-blue-gray-50">
-                {TABLE_HEADERS.map((header) => (
-                  <th key={header} className="tw-px-4 tw-py-3 tw-text-left">
-                    <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
-                      {header}
-                    </Typography>
-                  </th>
-                ))}
+                {TABLE_COLUMNS.map(({ key, label, sortField: columnSortField }) => {
+                  const sortable = Boolean(columnSortField);
+                  const isActive = columnSortField ? sortField === columnSortField : false;
+                  const ariaSort: "ascending" | "descending" | "none" | undefined = !sortable
+                    ? undefined
+                    : isActive
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none";
+                  return (
+                    <th key={key} className="tw-px-4 tw-py-3 tw-text-left" aria-sort={ariaSort}>
+                      {sortable ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(columnSortField!)}
+                          className="tw-inline-flex tw-items-center tw-gap-1 tw-text-blue-gray-500 focus:tw-outline-none"
+                          aria-label={`Sort by ${label}`}
+                          aria-pressed={isActive}
+                        >
+                          <span className="tw-text-xs tw-font-semibold tw-uppercase tw-opacity-70">{label}</span>
+                          {getSortIcon(columnSortField!)}
+                        </button>
+                      ) : (
+                        <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
+                          {label}
+                        </Typography>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>{renderBody()}</tbody>
@@ -305,19 +388,27 @@ export default function VendorsTable({ filters }: Props) {
           <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
             Showing page {page} of {totalPages} (total {total} vendors)
           </Typography>
-          <div className="tw-flex tw-items-center tw-gap-2">
-            <Button variant="outlined" color="gray" size="sm" onClick={handlePrevPage} disabled={page === 1}>
-              Previous
-            </Button>
-            <Button
-              variant="outlined"
-              color="gray"
-              size="sm"
-              onClick={handleNextPage}
-              disabled={page >= totalPages}
-            >
-              Next
-            </Button>
+          <div className="tw-flex tw-flex-col tw-gap-3 sm:tw-flex-row sm:tw-items-center">
+            <PageSizeSelect
+              value={pageSize}
+              onChange={handlePageSizeChange}
+              className="sm:tw-w-36"
+              label="Rows per page"
+            />
+            <div className="tw-flex tw-items-center tw-gap-2">
+              <Button variant="outlined" color="gray" size="sm" onClick={handlePrevPage} disabled={page === 1}>
+                Previous
+              </Button>
+              <Button
+                variant="outlined"
+                color="gray"
+                size="sm"
+                onClick={handleNextPage}
+                disabled={page >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardFooter>
       </Card>

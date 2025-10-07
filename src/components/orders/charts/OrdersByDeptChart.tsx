@@ -25,7 +25,12 @@ export default function OrdersByDeptChart() {
   const { data, error, isLoading } = useSWR<ResponseData>(
     "/api/aggregates/orders/by-dept-urgent",
     fetcher,
-    { refreshInterval: 60_000 }
+    {
+      refreshInterval: 60_000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const labels = data?.labels ?? [];

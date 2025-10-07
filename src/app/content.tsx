@@ -4,7 +4,6 @@ import React from "react";
 
 import routes from "@/routes";
 
-import { Cog6ToothIcon } from "@heroicons/react/24/solid";
 import { IconButton } from "@material-tailwind/react";
 import { DashboardNavbar, Configurator, Footer } from "@/widgets/layout";
 
@@ -42,15 +41,6 @@ export default function InnerContent({
           <>
             <DashboardNavbar />
             <Configurator />
-            <IconButton
-              size="lg"
-              color="white"
-              className="!tw-fixed tw-bottom-8 tw-right-8 tw-z-40 tw-rounded-full tw-shadow-blue-gray-900/10"
-              ripple={false}
-              onClick={() => setOpenConfigurator(dispatch, true)}
-            >
-              <Cog6ToothIcon className="tw-h-5 tw-w-5" />
-            </IconButton>
           </>
         )}
         {children}

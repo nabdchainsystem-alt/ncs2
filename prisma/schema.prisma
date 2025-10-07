@@ -107,6 +107,13 @@ enum Priority {
   Urgent
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HOLD
+}
+
 model Request {
   id           String        @id @default(cuid())
   code         String        @unique
@@ -118,6 +125,7 @@ model Request {
   neededBy     DateTime?
   description  String?
   status       RequestStatus @default(OPEN)
+  approvalStatus ApprovalStatus @default(PENDING)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -234,8 +242,9 @@ model PurchaseOrder {
   vatAmount Decimal
   total     Decimal
   currency  String
-  status    POStatus @default(OPEN)
-  priority  Priority @default(Normal)
+  status          POStatus        @default(OPEN)
+  approvalStatus  ApprovalStatus  @default(PENDING)
+  priority        Priority        @default(Normal)
   note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

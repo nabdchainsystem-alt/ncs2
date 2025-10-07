@@ -6,7 +6,7 @@ import {
   HomeModernIcon,
   CubeIcon,
   UsersIcon,
-  Cog6ToothIcon,
+  CpuChipIcon,
 } from "@heroicons/react/24/outline";
 
 import BlackBoxKpiCard from "@/components/ui/kpi/BlackBoxKpiCard";
@@ -156,7 +156,7 @@ export default function DataKpiRow() {
         subtitle={vendorsSubtitle}
       />
       <BlackBoxKpiCard
-        icon={<Cog6ToothIcon className="tw-h-6 tw-w-6" />}
+        icon={<CpuChipIcon className="tw-h-6 tw-w-6" />}
         title="Machines"
         value={machinesValue}
         subtitle={machinesSubtitle}

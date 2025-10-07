@@ -9,6 +9,7 @@ export type RequestRowDto = {
   neededBy: string | null;
   description: string | null;
   status: "OPEN" | "PENDING" | "CLOSED" | "CANCELLED";
+  approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
   createdAt: string;
   updatedAt: string;
   itemsCount: number;

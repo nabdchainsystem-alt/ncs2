@@ -111,7 +111,12 @@ export default function SpendAnalysisClosedOrders() {
     isLoading: materialsLoading,
   } = useSWR<SpendTableResponse>(
     "/api/aggregates/orders/spend/top-materials?limit=10",
-    fetchTable
+    fetchTable,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const {
@@ -120,7 +125,12 @@ export default function SpendAnalysisClosedOrders() {
     isLoading: vendorsLoading,
   } = useSWR<SpendTableResponse>(
     "/api/aggregates/orders/spend/top-vendors?limit=10",
-    fetchTable
+    fetchTable,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const {
@@ -129,7 +139,12 @@ export default function SpendAnalysisClosedOrders() {
     isLoading: materialsDistributionLoading,
   } = useSWR<SpendDistributionResponse>(
     "/api/aggregates/orders/spend/materials-distribution",
-    fetchDistribution
+    fetchDistribution,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const {
@@ -138,7 +153,12 @@ export default function SpendAnalysisClosedOrders() {
     isLoading: vendorsDistributionLoading,
   } = useSWR<SpendDistributionResponse>(
     "/api/aggregates/orders/spend/vendors-distribution",
-    fetchDistribution
+    fetchDistribution,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const {
@@ -147,7 +167,12 @@ export default function SpendAnalysisClosedOrders() {
     isLoading: departmentSpendLoading,
   } = useSWR<DepartmentSpendResponse>(
     "/api/aggregates/orders/spend/by-department",
-    fetchDepartmentSpend
+    fetchDepartmentSpend,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const materialRows = materials?.rows ?? [];
@@ -314,13 +339,16 @@ export default function SpendAnalysisClosedOrders() {
           <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
             Top material by spend
           </Typography>
-          <div className="tw-mt-1 tw-flex tw-items-center tw-gap-2">
+          <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2">
             <Typography variant="h6" color="blue-gray">
-              {formatCurrency(topValue)}
+              {topLabel}
             </Typography>
             <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-blue-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-uppercase tw-text-blue-700">
-              {`${Math.round(percentage)}% ${topLabel.toUpperCase()}`}
+              {`${Math.round(percentage)}% of spend`}
             </span>
+            <Typography variant="small" className="!tw-font-semibold !tw-text-blue-gray-500">
+              {formatCurrency(topValue)}
+            </Typography>
           </div>
         </div>
       </div>

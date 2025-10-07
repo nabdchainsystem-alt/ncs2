@@ -71,7 +71,12 @@ export default function SpendByMachineCategory() {
     isLoading,
   } = useSWR<MachineSpendResponse>(
     "/api/aggregates/orders/spend/by-machine",
-    fetchMachineSpend
+    fetchMachineSpend,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const rows = data?.rows ?? [];

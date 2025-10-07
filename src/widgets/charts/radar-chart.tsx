@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 // deepmerge
@@ -16,7 +16,7 @@ type PropTypes = {
   options?: {};
 };
 
-export function RadarChart({
+const RadarChartComponent = memo(function RadarChart({
   height = 350,
   colors,
   series,
@@ -37,6 +37,9 @@ export function RadarChart({
             zoom: {
               enabled: false,
             },
+            animations: {
+              enabled: true,
+            },
           },
           legend: {
             show: false,
@@ -51,7 +54,11 @@ export function RadarChart({
     [height, colors, options]
   );
   return (
-    <div ref={containerRef} className="tw-w-full">
+    <div
+      ref={containerRef}
+      className="tw-w-full tw-min-h-[300px]"
+      style={{ minHeight: Math.max(height, 300) }}
+    >
       {ready ? (
         <ReactApexChart
           height={height}
@@ -61,15 +68,15 @@ export function RadarChart({
           options={chartOptions as any}
         />
       ) : (
-        <div
-          className="tw-grid tw-w-full tw-place-items-center tw-text-blue-gray-300"
-          style={{ height }}
-        >
+        <div className="tw-flex tw-h-full tw-w-full tw-items-center tw-justify-center tw-text-blue-gray-300">
           Loading chart…
         </div>
       )}
     </div>
   );
-}
+});
 
-export default RadarChart;
+RadarChartComponent.displayName = "RadarChart";
+
+export const RadarChart = RadarChartComponent;
+export default RadarChartComponent;

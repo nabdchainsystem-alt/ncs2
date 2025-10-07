@@ -93,7 +93,12 @@ export default function MonthlyTrendsSection() {
     isLoading: cardsLoading,
   } = useSWR<MonthlyCardsResponse>(
     "/api/aggregates/orders/monthly-cards",
-    fetchMonthlyCards
+    fetchMonthlyCards,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const {
@@ -102,7 +107,12 @@ export default function MonthlyTrendsSection() {
     isLoading: trendLoading,
   } = useSWR<MonthlyTrendResponse>(
     "/api/aggregates/orders/monthly-trend",
-    fetchMonthlyTrend
+    fetchMonthlyTrend,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
   );
 
   const cardsData = cards ?? DEFAULT_CARDS;

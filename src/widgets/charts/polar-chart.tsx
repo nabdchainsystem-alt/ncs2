@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 // deepmerge
@@ -17,7 +17,7 @@ type PropTypes = {
   options?: {};
 };
 
-export function PolarChart({
+const PolarChartComponent = memo(function PolarChart({
   height = 350,
   colors,
   labels,
@@ -40,6 +40,9 @@ export function PolarChart({
             zoom: {
               enabled: false,
             },
+            animations: {
+              enabled: true,
+            },
           },
           stroke: {
             colors: ["#fff"],
@@ -57,7 +60,11 @@ export function PolarChart({
     [colors, labels, height, options]
   );
   return (
-    <div ref={containerRef} className="tw-w-full">
+    <div
+      ref={containerRef}
+      className="tw-w-full tw-min-h-[300px]"
+      style={{ minHeight: Math.max(height, 300) }}
+    >
       {ready ? (
         <ReactApexChart
           height={height}
@@ -67,15 +74,15 @@ export function PolarChart({
           series={series}
         />
       ) : (
-        <div
-          className="tw-grid tw-w-full tw-place-items-center tw-text-blue-gray-300"
-          style={{ height }}
-        >
+        <div className="tw-flex tw-h-full tw-w-full tw-items-center tw-justify-center tw-text-blue-gray-300">
           Loading chart…
         </div>
       )}
     </div>
   );
-}
+});
 
-export default PolarChart;
+PolarChartComponent.displayName = "PolarChart";
+
+export const PolarChart = PolarChartComponent;
+export default PolarChartComponent;

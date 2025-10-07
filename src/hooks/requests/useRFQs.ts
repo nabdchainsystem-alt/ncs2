@@ -20,6 +20,7 @@ export type RFQRow = {
   note: string | null;
   itemCode: string | null;
   itemName: string | null;
+  materialId: string | null;
 };
 
 export type RFQParams = {

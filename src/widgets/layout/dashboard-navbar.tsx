@@ -20,7 +20,6 @@ import {
 
 import {
   UserCircleIcon,
-  Cog6ToothIcon,
   BellIcon,
   Bars3Icon,
   HomeIcon,
@@ -151,13 +150,6 @@ export function DashboardNavbar() {
                 className="tw-h-6 tw-w-6 tw-text-gray-900"
               />
             )}
-          </IconButton>
-          <IconButton
-            variant="text"
-            color="gray"
-            onClick={() => setOpenConfigurator(dispatch, true)}
-          >
-            <Cog6ToothIcon className="tw-h-5 tw-w-5 tw-text-gray-900" />
           </IconButton>
           <Menu>
             <MenuHandler>

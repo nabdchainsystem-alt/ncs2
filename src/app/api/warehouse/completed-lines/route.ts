@@ -40,6 +40,17 @@ export async function GET(request: Request) {
               },
             },
           },
+          purchaseOrder: {
+            include: {
+              rfq: {
+                include: {
+                  request: {
+                    include: { warehouse: true },
+                  },
+                },
+              },
+            },
+          },
         },
       }),
     ]);
@@ -60,6 +71,7 @@ export async function GET(request: Request) {
       inventoryStatus: row.inventoryStatus,
       createdAt: row.createdAt.toISOString(),
       category: row.purchaseOrderItem?.material?.category ?? null,
+      warehouseName: row.purchaseOrder?.rfq?.request?.warehouse?.name ?? null,
     }));
 
     return NextResponse.json(

@@ -9,6 +9,7 @@ export type RequestRow = {
   warehouseName?: string | null;
   machineName?: string | null;
   status: "OPEN" | "PENDING" | "CLOSED" | "CANCELLED";
+  approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
   priority: "Low" | "Normal" | "High" | "Urgent";
   primaryItemCode: string | null;
   primaryItemName: string | null;
@@ -16,6 +17,7 @@ export type RequestRow = {
 
 const STATUS_VALUES = new Set<RequestRow["status"]>(["OPEN", "PENDING", "CLOSED", "CANCELLED"]);
 const PRIORITY_VALUES = new Set<RequestRow["priority"]>(["Low", "Normal", "High", "Urgent"]);
+const APPROVAL_VALUES = new Set<RequestRow["approvalStatus"]>(["PENDING", "APPROVED", "REJECTED"]);
 
 export type PageDto<T> = {
   rows: T[];
@@ -82,6 +84,7 @@ export function useRequests(params: Params) {
 
     const safeRows: RequestRow[] = json.rows.map((row: any) => {
       const statusValue = STATUS_VALUES.has(row.status) ? row.status : "OPEN";
+      const approvalValue = APPROVAL_VALUES.has(row.approvalStatus) ? row.approvalStatus : "PENDING";
       const priorityValue = PRIORITY_VALUES.has(row.priority) ? row.priority : "Normal";
 
       return {
@@ -92,6 +95,7 @@ export function useRequests(params: Params) {
         warehouseName: row.warehouse?.name ?? row.warehouseName ?? null,
         machineName: row.machine?.name ?? row.machineName ?? null,
         status: statusValue,
+        approvalStatus: approvalValue,
         priority: priorityValue,
         primaryItemCode: typeof row.primaryItemCode === "string" ? row.primaryItemCode : null,
         primaryItemName: typeof row.primaryItemName === "string" ? row.primaryItemName : null,

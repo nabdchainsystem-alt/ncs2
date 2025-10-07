@@ -22,10 +22,13 @@ export type PoListRow = {
   total: string;
   currency: string;
   status: PoStatus;
+  approvalStatus: "PENDING" | "APPROVED" | "REJECTED" | "HOLD";
   priority: Priority;
   createdAt: string;
   primaryItemCode: string | null;
   primaryItemName: string | null;
+  departmentName: string | null;
+  departmentCode: string | null;
 };
 
 export type PoDetail = {
@@ -34,6 +37,7 @@ export type PoDetail = {
   quotationNo: string;
   vendorName: string;
   status: PoStatus;
+  approvalStatus: "PENDING" | "APPROVED" | "REJECTED" | "HOLD";
   priority: Priority;
   currency: string;
   vatPct: string;

@@ -52,6 +52,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       quotationNo: po.rfq.quotationNo,
       vendorName: po.vendor.nameEn,
       status: po.status,
+      approvalStatus: po.approvalStatus,
       priority: po.priority,
       currency: po.currency,
       vatPct: po.vatPct.toFixed(2),
@@ -209,8 +210,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
     }
 
-    return NextResponse.json(null, {
-      status: 204,
+    return NextResponse.json({ success: true }, {
+      status: 200,
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { ApprovalStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
@@ -83,6 +83,7 @@ export async function GET(request: Request) {
                 name: true,
                 unit: true,
                 qty: true,
+                materialId: true,
                 material: { select: { code: true, name: true } },
               },
               orderBy: { id: "asc" },
@@ -115,6 +116,7 @@ export async function GET(request: Request) {
       note: row.note ?? null,
       itemCode: row.request?.items?.[0]?.material?.code ?? null,
       itemName: row.request?.items?.[0]?.material?.name ?? row.request?.items?.[0]?.name ?? null,
+      materialId: row.request?.items?.[0]?.materialId ?? null,
     })),
     total,
     page,
@@ -137,10 +139,20 @@ export async function POST(request: Request) {
     const totalExVat = unitPriceDecimal.mul(qtyDecimal);
     const totalIncVat = totalExVat.mul(new Prisma.Decimal(1).add(vatDecimal.div(100)));
 
-    await Promise.all([
-      prisma.request.findUniqueOrThrow({ where: { id: parsed.requestId }, select: { id: true } }),
-      prisma.vendor.findUniqueOrThrow({ where: { id: parsed.vendorId }, select: { id: true } }),
-    ]);
+    const requestRecord = await prisma.request.findUnique({
+      where: { id: parsed.requestId },
+      select: { id: true, approvalStatus: true },
+    });
+
+    if (!requestRecord) {
+      return NextResponse.json({ message: "Request not found" }, { status: 404 });
+    }
+
+    if (requestRecord.approvalStatus !== ApprovalStatus.APPROVED) {
+      return NextResponse.json({ message: "Request must be approved before creating an RFQ" }, { status: 400 });
+    }
+
+    await prisma.vendor.findUniqueOrThrow({ where: { id: parsed.vendorId }, select: { id: true } });
 
     const quotationNo = `RFQ-${Date.now()}`;
 
@@ -208,4 +220,5 @@ type RFQRow = {
   note: string | null;
   itemCode: string | null;
   itemName: string | null;
+  materialId: string | null;
 };

@@ -9,12 +9,16 @@ import SpendAnalysisClosedOrders from "@/components/orders/analytics/SpendAnalys
 import SpendByMachineCategory from "@/components/orders/analytics/SpendByMachineCategory";
 import MonthlyTrendsSection from "@/components/orders/analytics/MonthlyTrendsSection";
 import DeliveryPerformanceSection from "@/components/orders/analytics/DeliveryPerformanceSection";
+// import OrderVelocityPulse from "@/components/orders/OrderVelocityPulse";
+import AuroraActivity from "@/components/common/AuroraActivity";
 
 export default function OrdersPage() {
   return (
     <div className="tw-mt-8 tw-mb-4 tw-space-y-6">
       <OrdersHero />
       <OrdersKpiBlock />
+      <AuroraActivity kind="orders" />
+      {/* <OrderVelocityPulse /> */}
       <section className="tw-grid tw-grid-cols-1 tw-items-stretch tw-gap-6 xl:tw-grid-cols-[minmax(0,1.05fr)_minmax(0,1.25fr)_minmax(0,1.2fr)]">
         <div className="tw-flex tw-h-full tw-flex-col">
           <OrdersRecentActivity />

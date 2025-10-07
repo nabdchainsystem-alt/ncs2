@@ -76,7 +76,21 @@ export async function GET(request: Request) {
         where,
         include: {
           vendor: { select: { nameEn: true } },
-          rfq: { select: { quotationNo: true } },
+          rfq: {
+            select: {
+              quotationNo: true,
+              request: {
+                select: {
+                  department: {
+                    select: {
+                      name: true,
+                      code: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           items: {
             select: {
               name: true,
@@ -109,10 +123,13 @@ export async function GET(request: Request) {
         total: po.total.toFixed(2),
         currency: po.currency,
         status: po.status,
+        approvalStatus: po.approvalStatus,
         priority: po.priority,
         createdAt: po.createdAt.toISOString(),
         primaryItemCode: primaryItem?.material?.code ?? null,
         primaryItemName: primaryItem?.name ?? null,
+        departmentName: po.rfq.request?.department?.name ?? null,
+        departmentCode: po.rfq.request?.department?.code ?? null,
       };
     });
 

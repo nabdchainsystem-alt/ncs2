@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 // @material-tailwind/react
@@ -14,6 +14,7 @@ import {
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 import { useApexContainer } from "./useApexContainer";
+import merge from "deepmerge";
 
 type PropTypes = {
   chart: {};
@@ -43,7 +44,7 @@ type PropTypes = {
     | "red";
 };
 
-export function StatisticsChart({
+const StatisticsChartComponent = memo(function StatisticsChart({
   color = "blue",
   chart,
   title,
@@ -61,6 +62,30 @@ export function StatisticsChart({
     return 280;
   }, [chart]);
 
+  const preparedChart = useMemo(() => {
+    if (!chart || typeof chart !== "object") {
+      return chart;
+    }
+
+    const base = chart as { options?: Record<string, any>; height?: number; [key: string]: any };
+    const mergedOptions = merge(
+      {
+        chart: {
+          animations: {
+            enabled: true,
+          },
+        },
+      },
+      base.options ?? {}
+    );
+
+    return {
+      ...base,
+      height: chartHeight,
+      options: mergedOptions,
+    };
+  }, [chart, chartHeight]);
+
   return (
     <Card className="tw-border tw-border-blue-gray-100 tw-shadow-sm">
       <CardHeader
@@ -69,14 +94,15 @@ export function StatisticsChart({
         floated={false}
         shadow={false}
       >
-        <div ref={containerRef} className="tw-w-full">
+        <div
+          ref={containerRef}
+          className="tw-w-full tw-min-h-[300px]"
+          style={{ minHeight: Math.max(chartHeight, 300) }}
+        >
           {ready ? (
-            <ReactApexChart {...chart} width={width || undefined} />
+            <ReactApexChart {...(preparedChart as any)} width={width || undefined} />
           ) : (
-            <div
-              className="tw-grid tw-w-full tw-place-items-center tw-text-white/80"
-              style={{ height: chartHeight }}
-            >
+            <div className="tw-flex tw-h-full tw-w-full tw-items-center tw-justify-center tw-text-white/80">
               Loading chart…
             </div>
           )}
@@ -100,6 +126,9 @@ export function StatisticsChart({
       )}
     </Card>
   );
-}
+});
 
-export default StatisticsChart;
+StatisticsChartComponent.displayName = "StatisticsChart";
+
+export const StatisticsChart = StatisticsChartComponent;
+export default StatisticsChartComponent;

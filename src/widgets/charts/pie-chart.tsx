@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 // deepmerge
@@ -17,7 +17,7 @@ type PropTypes = {
   options?: {};
 };
 
-export function PieChart({
+const PieChartComponent = memo(function PieChart({
   height = 350,
   series,
   colors,
@@ -40,6 +40,9 @@ export function PieChart({
             zoom: {
               enabled: false,
             },
+            animations: {
+              enabled: true,
+            },
           },
           dataLabels: {
             enabled: false,
@@ -54,7 +57,11 @@ export function PieChart({
     [height, colors, labels, options]
   );
   return (
-    <div ref={containerRef} className="tw-w-full">
+    <div
+      ref={containerRef}
+      className="tw-w-full tw-min-h-[380px]"
+      style={{ minHeight: Math.max(height + 140, 380) }}
+    >
       {ready ? (
         <ReactApexChart
           height={height}
@@ -64,15 +71,15 @@ export function PieChart({
           options={chartOptions as any}
         />
       ) : (
-        <div
-          className="tw-grid tw-w-full tw-place-items-center tw-text-blue-gray-300"
-          style={{ height }}
-        >
+        <div className="tw-flex tw-h-full tw-w-full tw-items-center tw-justify-center tw-text-blue-gray-300">
           Loading chart…
         </div>
       )}
     </div>
   );
-}
+});
 
-export default PieChart;
+PieChartComponent.displayName = "PieChart";
+
+export const PieChart = PieChartComponent;
+export default PieChartComponent;

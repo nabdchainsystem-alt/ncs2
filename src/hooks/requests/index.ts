@@ -58,6 +58,8 @@ export function useMaterialsOptions() {
     value: row.id,
     label: `${row.code} · ${row.name}`,
     unit: row.unit,
+    code: row.code ?? "",
+    materialName: row.name ?? "",
   }));
   const refresh = useCallback(() => mutate(), [mutate]);
   return { options, isLoading, refresh };

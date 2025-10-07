@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 // deepmerge
@@ -16,7 +16,7 @@ type PropTypes = {
   options?: {};
 };
 
-export function BubbleChart({
+const BubbleChartComponent = memo(function BubbleChart({
   height = 350,
   series,
   colors,
@@ -36,6 +36,9 @@ export function BubbleChart({
             },
             toolbar: {
               show: false,
+            },
+            animations: {
+              enabled: true,
             },
           },
           title: {
@@ -110,7 +113,11 @@ export function BubbleChart({
   );
 
   return (
-    <div ref={containerRef} className="tw-w-full">
+    <div
+      ref={containerRef}
+      className="tw-w-full tw-min-h-[300px]"
+      style={{ minHeight: Math.max(height, 300) }}
+    >
       {ready ? (
         <ReactApexChart
           type="bubble"
@@ -120,15 +127,15 @@ export function BubbleChart({
           options={chartOptions as any}
         />
       ) : (
-        <div
-          className="tw-grid tw-w-full tw-place-items-center tw-text-blue-gray-300"
-          style={{ height }}
-        >
+        <div className="tw-flex tw-h-full tw-w-full tw-items-center tw-justify-center tw-text-blue-gray-300">
           Loading chart…
         </div>
       )}
     </div>
   );
-}
+});
 
-export default BubbleChart;
+BubbleChartComponent.displayName = "BubbleChart";
+
+export const BubbleChart = BubbleChartComponent;
+export default BubbleChartComponent;

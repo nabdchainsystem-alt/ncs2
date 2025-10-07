@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
 
 import {
   Card,
   CardBody,
   CardHeader,
+  CardFooter,
   Chip,
   Alert,
   Dialog,
@@ -19,36 +20,79 @@ import {
   Typography,
   Button,
 } from "@/components/MaterialTailwind";
+import PageSizeSelect from "@/components/common/PageSizeSelect";
 import {
+  ChevronDownIcon,
+  ChevronUpDownIcon,
+  ChevronUpIcon,
+  DocumentPlusIcon,
   PencilSquareIcon,
   TrashIcon,
-  DocumentPlusIcon,
 } from "@heroicons/react/24/outline";
 
 import { useRFQs, useDeleteRFQ } from "@/hooks/requests";
 import type { RFQRow } from "@/hooks/requests";
 import { useCreatePurchaseOrder } from "@/hooks/orders/usePurchaseOrders";
 
-const columns = [
-  "QUOTATION NO",
-  "REQUEST",
-  "VENDOR",
-  "ITEM CODE",
-  "ITEM NAME",
-  "QTY",
-  "UNIT PRICE",
-  "VALUE (SAR)",
-  "STATUS",
-  "ACTIONS",
-] as const;
+type SortField =
+  | "quotationNo"
+  | "requestCode"
+  | "vendorName"
+  | "itemCode"
+  | "itemName"
+  | "qty"
+  | "unitPrice"
+  | "totalIncVat"
+  | "requestStatus"
+  | "createdAt";
+
+type ColumnConfig = {
+  key: string;
+  label: string;
+  sortField?: SortField;
+};
+
+const TABLE_COLUMNS: ColumnConfig[] = [
+  { key: "quotationNo", label: "QUOTATION NO", sortField: "quotationNo" },
+  { key: "requestCode", label: "REQUEST", sortField: "requestCode" },
+  { key: "vendorName", label: "VENDOR", sortField: "vendorName" },
+  { key: "itemCode", label: "ITEM CODE", sortField: "itemCode" },
+  { key: "itemName", label: "ITEM NAME", sortField: "itemName" },
+  { key: "qty", label: "QTY", sortField: "qty" },
+  { key: "unitPrice", label: "UNIT PRICE", sortField: "unitPrice" },
+  { key: "totalIncVat", label: "VALUE (SAR)", sortField: "totalIncVat" },
+  { key: "requestStatus", label: "STATUS", sortField: "requestStatus" },
+  { key: "actions", label: "ACTIONS" },
+];
 
 const formatCurrency = (value: number) =>
   value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function RFQPipeline() {
-  const { rows, isLoading, isError, error, mutate } = useRFQs({ page: 1, pageSize: 10, sort: "createdAt:desc" });
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(5);
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const {
+    rows,
+    total,
+    page: currentPage,
+    pageSize: currentPageSize,
+    isLoading,
+    isError,
+    error,
+    mutate,
+  } = useRFQs({
+    page,
+    pageSize,
+    sort: `${sortField}:${sortDirection}` as const,
+    ...(search.trim() ? { search: search.trim() } : {}),
+  });
   const { deleteRFQ } = useDeleteRFQ();
   const { create: createPurchaseOrder, isLoading: isCreatingPo } = useCreatePurchaseOrder();
+  const totalPages = Math.max(1, Math.ceil(total / (currentPageSize || pageSize)));
   const { mutate: globalMutate } = useSWRConfig();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; quotationNo: string } | null>(null);
   const [editTarget, setEditTarget] = useState<{ id: string; note: string } | null>(null);
@@ -56,6 +100,37 @@ export default function RFQPipeline() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [poAlert, setPoAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  const handlePageSizeChange = useCallback((value: number) => {
+    setPageSize(value);
+  }, []);
+
+  const handleSort = useCallback((field: SortField) => {
+    setPage(1);
+    setSortField((prevField) => {
+      if (prevField === field) {
+        setSortDirection((prevDirection) => (prevDirection === "asc" ? "desc" : "asc"));
+        return prevField;
+      }
+      setSortDirection("asc");
+      return field;
+    });
+  }, []);
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ChevronUpDownIcon className="tw-h-4 tw-w-4 tw-text-blue-gray-300" />;
+    }
+    return sortDirection === "asc" ? (
+      <ChevronUpIcon className="tw-h-4 tw-w-4 tw-text-blue-gray-500" />
+    ) : (
+      <ChevronDownIcon className="tw-h-4 tw-w-4 tw-text-blue-gray-500" />
+    );
+  };
 
   useEffect(() => {
     if (!poAlert) return;
@@ -78,7 +153,7 @@ export default function RFQPipeline() {
         vatPct: row.vatPct ?? 15,
         items: [
           {
-            materialId: undefined,
+            materialId: row.materialId ?? undefined,
             name: row.itemName ?? row.itemCode ?? row.requestCode ?? row.quotationNo,
             qty: row.qty > 0 ? row.qty : 1,
             unit: "PC" as const,
@@ -105,7 +180,7 @@ export default function RFQPipeline() {
     if (isLoading) {
       return (
         <tr>
-          <td colSpan={columns.length} className="tw-px-6 tw-py-12 tw-text-center tw-text-blue-gray-400">
+          <td colSpan={TABLE_COLUMNS.length} className="tw-px-6 tw-py-12 tw-text-center tw-text-blue-gray-400">
             Loading RFQs...
           </td>
         </tr>
@@ -115,7 +190,7 @@ export default function RFQPipeline() {
     if (isError) {
       return (
         <tr>
-          <td colSpan={columns.length} className="tw-px-6 tw-py-12">
+          <td colSpan={TABLE_COLUMNS.length} className="tw-px-6 tw-py-12">
             <div className="tw-flex tw-flex-col tw-items-center tw-gap-3">
               <Typography variant="small" className="!tw-font-normal !tw-text-red-500">
                 {error instanceof Error ? error.message : "Unable to load RFQs"}
@@ -137,7 +212,7 @@ export default function RFQPipeline() {
     if (!rows.length) {
       return (
         <tr>
-          <td colSpan={columns.length} className="tw-px-6 tw-py-12">
+          <td colSpan={TABLE_COLUMNS.length} className="tw-px-6 tw-py-12">
             <div className="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-2 tw-text-center">
               <Typography variant="h6" color="blue-gray">
                 No RFQs yet
@@ -219,7 +294,7 @@ export default function RFQPipeline() {
         <CardHeader
           floated={false}
           shadow={false}
-          className="tw-rounded-none tw-border-b tw-border-blue-gray-50 tw-p-6"
+          className="tw-flex tw-flex-col tw-gap-4 tw-rounded-none tw-border-b tw-border-blue-gray-50 tw-p-6 lg:tw-flex-row lg:tw-items-center lg:tw-justify-between"
         >
           <div className="tw-flex tw-flex-col tw-gap-1">
             <Typography variant="h5" color="blue-gray">
@@ -228,6 +303,24 @@ export default function RFQPipeline() {
             <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
               Track vendor quotations across sourcing stages
             </Typography>
+          </div>
+          <div className="tw-flex tw-flex-col tw-gap-3 sm:tw-flex-row sm:tw-items-center">
+            <PageSizeSelect
+              value={pageSize}
+              onChange={handlePageSizeChange}
+              className="sm:tw-w-36"
+              label="Rows per page"
+            />
+            <Input
+              label="Search RFQs"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              className="sm:tw-w-64"
+              crossOrigin="anonymous"
+            />
           </div>
         </CardHeader>
         <CardBody className="tw-overflow-x-auto tw-p-0">
@@ -239,22 +332,71 @@ export default function RFQPipeline() {
           <table className="tw-min-w-max tw-w-full tw-table-auto tw-text-center">
             <thead className="tw-bg-blue-gray-50/60">
               <tr>
-                {columns.map((column) => (
-                  <th key={column} className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4">
-                    <Typography
-                      variant="small"
-                      color="blue-gray"
-                      className="tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
-                    >
-                      {column}
-                    </Typography>
-                  </th>
-                ))}
+                {TABLE_COLUMNS.map(({ key, label, sortField: columnSortField }) => {
+                  const sortable = Boolean(columnSortField);
+                  const isActive = columnSortField ? sortField === columnSortField : false;
+                  const ariaSort: "ascending" | "descending" | "none" | undefined = !sortable
+                    ? undefined
+                    : isActive
+                    ? sortDirection === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : "none";
+                  return (
+                    <th key={key} className="tw-border-b tw-border-blue-gray-50 tw-px-6 tw-py-4" aria-sort={ariaSort}>
+                      {sortable ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(columnSortField!)}
+                          className="tw-inline-flex tw-items-center tw-justify-center tw-gap-1 tw-text-blue-gray-500 focus:tw-outline-none"
+                          aria-label={`Sort by ${label}`}
+                          aria-pressed={isActive}
+                        >
+                          <span className="tw-text-xs tw-font-semibold tw-uppercase tw-opacity-70">{label}</span>
+                          {getSortIcon(columnSortField!)}
+                        </button>
+                      ) : (
+                        <Typography
+                          variant="small"
+                          color="blue-gray"
+                          className="tw-text-xs !tw-font-semibold tw-uppercase tw-opacity-70"
+                        >
+                          {label}
+                        </Typography>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>{renderBody()}</tbody>
           </table>
         </CardBody>
+        <CardFooter className="tw-flex tw-flex-col tw-gap-3 md:tw-flex-row md:tw-items-center md:tw-justify-between">
+          <Typography variant="small" className="!tw-font-normal !tw-text-blue-gray-500">
+            Page {currentPage} of {totalPages}
+          </Typography>
+          <div className="tw-flex tw-gap-2">
+            <Button
+              variant="outlined"
+              color="blue-gray"
+              size="sm"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            >
+              Prev
+            </Button>
+            <Button
+              variant="outlined"
+              color="blue-gray"
+              size="sm"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+            >
+              Next
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
 
       {deleteTarget ? (
