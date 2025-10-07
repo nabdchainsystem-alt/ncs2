@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -18,10 +12,10 @@ model Department {
   code      String    @unique
   name      String
   location  String?
-  machines  Machine[]
-  requests  Request[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  machines  Machine[]
+  requests  Request[]
 }
 
 model Warehouse {
@@ -30,10 +24,10 @@ model Warehouse {
   name      String
   location  String?
   sizeM2    Int?
-  materials Material[]
-  requests  Request[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  materials Material[]
+  requests  Request[]
 }
 
 model Material {
@@ -44,11 +38,11 @@ model Material {
   category     String
   minQty       Decimal       @default(0)
   warehouseId  String?
-  warehouse    Warehouse?    @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
-  requestItems RequestItem[]
-  poItems      POItem[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  warehouse    Warehouse?    @relation(fields: [warehouseId], references: [id])
+  poItems      POItem[]
+  requestItems RequestItem[]
 }
 
 model Vendor {
@@ -73,11 +67,11 @@ model Vendor {
   iban           String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  requests       Request[]
-  rfqs           RFQ[]
-  purchaseOrders PurchaseOrder[]
-  invoices       Invoice[]
   followups      Followup[]
+  invoices       Invoice[]
+  purchaseOrders PurchaseOrder[]
+  rfqs           RFQ[]
+  requests       Request[]
 }
 
 model Machine {
@@ -87,10 +81,229 @@ model Machine {
   status       String
   notes        String?
   departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+  department   Department? @relation(fields: [departmentId], references: [id])
   requests     Request[]
+}
+
+model Request {
+  id             String            @id @default(cuid())
+  code           String            @unique
+  departmentId   String?
+  warehouseId    String?
+  machineId      String?
+  vendorId       String?
+  priority       Priority
+  neededBy       DateTime?
+  description    String?
+  status         RequestStatus     @default(OPEN)
+  approvalStatus ApprovalStatus    @default(PENDING)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  rfqs           RFQ[]
+  department     Department?       @relation(fields: [departmentId], references: [id])
+  machine        Machine?          @relation(fields: [machineId], references: [id])
+  vendor         Vendor?           @relation(fields: [vendorId], references: [id])
+  warehouse      Warehouse?        @relation(fields: [warehouseId], references: [id])
+  activities     RequestActivity[]
+  followUps      RequestFollowUp[]
+  items          RequestItem[]
+}
+
+model RequestItem {
+  id         String    @id @default(cuid())
+  requestId  String
+  materialId String?
+  name       String?
+  qty        Float
+  unit       String
+  note       String?
+  material   Material? @relation(fields: [materialId], references: [id])
+  request    Request   @relation(fields: [requestId], references: [id])
+
+  @@index([requestId])
+}
+
+model RequestActivity {
+  id        String   @id @default(cuid())
+  requestId String?
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+  request   Request? @relation(fields: [requestId], references: [id])
+
+  @@index([createdAt])
+  @@index([requestId])
+}
+
+model RequestFollowUp {
+  id        String   @id @default(cuid())
+  requestId String?
+  title     String
+  notes     String?
+  dueDate   DateTime
+  priority  Priority @default(Normal)
+  status    String   @default("Pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  request   Request? @relation(fields: [requestId], references: [id])
+
+  @@index([dueDate])
+  @@index([requestId])
+}
+
+model RFQ {
+  id             String          @id @default(cuid())
+  quotationNo    String          @unique
+  requestId      String
+  vendorId       String
+  unitPrice      Decimal
+  vatPct         Decimal
+  qty            Decimal
+  totalExVat     Decimal
+  totalIncVat    Decimal
+  note           String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  purchaseOrders PurchaseOrder[]
+  request        Request         @relation(fields: [requestId], references: [id])
+  vendor         Vendor          @relation(fields: [vendorId], references: [id])
+
+  @@index([requestId])
+  @@index([vendorId])
+}
+
+model Sequence {
+  id        Int      @id @default(autoincrement())
+  kind      String   @unique
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model PurchaseOrder {
+  id                 String                   @id @default(cuid())
+  poNo               String                   @unique
+  rfqId              String
+  vendorId           String
+  subtotal           Decimal
+  vatPct             Decimal
+  vatAmount          Decimal
+  total              Decimal
+  currency           String
+  status             POStatus                 @default(OPEN)
+  approvalStatus     ApprovalStatus           @default(PENDING)
+  priority           Priority                 @default(Normal)
+  note               String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  completedTransfers CompletedOrderTransfer[] @relation("PurchaseOrderCompletedTransfers")
+  invoices           Invoice[]
+  items              POItem[]
+  rfq                RFQ                      @relation(fields: [rfqId], references: [id])
+  vendor             Vendor                   @relation(fields: [vendorId], references: [id])
+  followUps          PurchaseOrderFollowUp[]
+
+  @@index([vendorId])
+  @@index([rfqId])
+}
+
+model POItem {
+  id                String                  @id @default(cuid())
+  poId              String
+  materialId        String?
+  name              String
+  qty               Decimal
+  unitPrice         Decimal
+  lineTotal         Decimal
+  unit              String
+  note              String?
+  completedTransfer CompletedOrderTransfer? @relation("POItemCompletedTransfer")
+  material          Material?               @relation(fields: [materialId], references: [id])
+  po                PurchaseOrder           @relation(fields: [poId], references: [id])
+
+  @@index([poId])
+}
+
+model CompletedOrderTransfer {
+  id                String                  @id @default(cuid())
+  poId              String
+  poItemId          String                  @unique
+  poNo              String
+  vendorId          String
+  vendorName        String
+  requestPriority   Priority
+  materialCode      String?
+  itemName          String
+  qty               Decimal
+  unit              String
+  unitPrice         Decimal
+  lineTotal         Decimal
+  transferStatus    TransferStatus          @default(PENDING)
+  inventoryStatus   TransferInventoryStatus @default(NORMAL)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  purchaseOrder     PurchaseOrder           @relation("PurchaseOrderCompletedTransfers", fields: [poId], references: [id])
+  purchaseOrderItem POItem                  @relation("POItemCompletedTransfer", fields: [poItemId], references: [id])
+
+  @@index([poId])
+  @@index([transferStatus])
+  @@index([inventoryStatus])
+}
+
+model PurchaseOrderFollowUp {
+  id              String         @id @default(cuid())
+  purchaseOrderId String?
+  title           String
+  dueDate         DateTime
+  priority        Priority       @default(Normal)
+  status          String         @default("Pending")
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+
+  @@index([dueDate])
+  @@index([purchaseOrderId])
+}
+
+model Followup {
+  id          String   @id @default(cuid())
+  vendorId    String
+  title       String
+  dueAt       DateTime
+  priority    Priority @default(Normal)
+  status      String   @default("open")
+  relatedType String?
+  relatedId   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+
+  @@index([vendorId])
+  @@index([dueAt])
+  @@index([status])
+}
+
+model Invoice {
+  id        String         @id @default(cuid())
+  vendorId  String
+  poId      String?
+  number    String         @unique
+  issueDate DateTime
+  dueDate   DateTime
+  amount    Decimal
+  paid      Decimal        @default(0)
+  status    String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  po        PurchaseOrder? @relation(fields: [poId], references: [id])
+  vendor    Vendor         @relation(fields: [vendorId], references: [id])
+
+  @@index([vendorId])
+  @@index([dueDate])
+  @@index([status])
 }
 
 enum RequestStatus {
@@ -114,105 +327,6 @@ enum ApprovalStatus {
   HOLD
 }
 
-model Request {
-  id           String        @id @default(cuid())
-  code         String        @unique
-  departmentId String?
-  warehouseId  String?
-  machineId    String?
-  vendorId     String?
-  priority     Priority
-  neededBy     DateTime?
-  description  String?
-  status       RequestStatus @default(OPEN)
-  approvalStatus ApprovalStatus @default(PENDING)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  department Department?       @relation(fields: [departmentId], references: [id])
-  warehouse  Warehouse?        @relation(fields: [warehouseId], references: [id])
-  machine    Machine?          @relation(fields: [machineId], references: [id])
-  vendor     Vendor?           @relation(fields: [vendorId], references: [id])
-  items      RequestItem[]
-  activities RequestActivity[]
-  followUps  RequestFollowUp[]
-  rfqs       RFQ[]
-}
-
-model RequestItem {
-  id         String  @id @default(cuid())
-  requestId  String
-  materialId String?
-  name       String?
-  qty        Float
-  unit       String
-  note       String?
-
-  material Material? @relation(fields: [materialId], references: [id])
-  request  Request   @relation(fields: [requestId], references: [id])
-
-  @@index([requestId])
-}
-
-model RequestActivity {
-  id        String   @id @default(cuid())
-  requestId String?
-  action    String
-  detail    String?
-  createdAt DateTime @default(now())
-
-  request Request? @relation(fields: [requestId], references: [id], onDelete: SetNull)
-
-  @@index([createdAt])
-  @@index([requestId])
-}
-
-model RequestFollowUp {
-  id        String   @id @default(cuid())
-  requestId String?
-  title     String
-  notes     String?
-  dueDate   DateTime
-  priority  Priority @default(Normal)
-  status    String   @default("Pending")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  request Request? @relation(fields: [requestId], references: [id], onDelete: SetNull)
-
-  @@index([dueDate])
-  @@index([requestId])
-}
-
-model RFQ {
-  id          String   @id @default(cuid())
-  quotationNo String   @unique
-  requestId   String
-  vendorId    String
-  unitPrice   Decimal
-  vatPct      Decimal
-  qty         Decimal
-  totalExVat  Decimal
-  totalIncVat Decimal
-  note        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  request        Request         @relation(fields: [requestId], references: [id])
-  vendor         Vendor          @relation(fields: [vendorId], references: [id])
-  purchaseOrders PurchaseOrder[]
-
-  @@index([requestId])
-  @@index([vendorId])
-}
-
-model Sequence {
-  id        Int      @id @default(autoincrement())
-  kind      String   @unique
-  lastValue Int      @default(0)
-  updatedAt DateTime @updatedAt
-}
-
 enum POStatus {
   OPEN
   PARTIAL
@@ -230,136 +344,4 @@ enum TransferInventoryStatus {
   NORMAL
   LOW
   OUT
-}
-
-model PurchaseOrder {
-  id        String   @id @default(cuid())
-  poNo      String   @unique
-  rfqId     String
-  vendorId  String
-  subtotal  Decimal
-  vatPct    Decimal
-  vatAmount Decimal
-  total     Decimal
-  currency  String
-  status          POStatus        @default(OPEN)
-  approvalStatus  ApprovalStatus  @default(PENDING)
-  priority        Priority        @default(Normal)
-  note      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  vendor             Vendor                   @relation(fields: [vendorId], references: [id])
-  rfq                RFQ                      @relation(fields: [rfqId], references: [id])
-  items              POItem[]
-  followUps          PurchaseOrderFollowUp[]
-  completedTransfers CompletedOrderTransfer[] @relation("PurchaseOrderCompletedTransfers")
-  invoices           Invoice[]
-
-  @@index([vendorId])
-  @@index([rfqId])
-}
-
-model POItem {
-  id         String  @id @default(cuid())
-  poId       String
-  materialId String?
-  name       String
-  qty        Decimal
-  unitPrice  Decimal
-  lineTotal  Decimal
-  unit       String
-  note       String?
-
-  material          Material?               @relation(fields: [materialId], references: [id])
-  po                PurchaseOrder           @relation(fields: [poId], references: [id])
-  completedTransfer CompletedOrderTransfer? @relation("POItemCompletedTransfer")
-
-  @@index([poId])
-}
-
-model CompletedOrderTransfer {
-  id              String                  @id @default(cuid())
-  poId            String
-  poItemId        String
-  poNo            String
-  vendorId        String
-  vendorName      String
-  requestPriority Priority
-  materialCode    String?
-  itemName        String
-  qty             Decimal
-  unit            String
-  unitPrice       Decimal
-  lineTotal       Decimal
-  transferStatus  TransferStatus          @default(PENDING)
-  inventoryStatus TransferInventoryStatus @default(NORMAL)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
-
-  purchaseOrder     PurchaseOrder @relation("PurchaseOrderCompletedTransfers", fields: [poId], references: [id])
-  purchaseOrderItem POItem        @relation("POItemCompletedTransfer", fields: [poItemId], references: [id])
-
-  @@unique([poItemId])
-  @@index([poId])
-  @@index([transferStatus])
-  @@index([inventoryStatus])
-}
-
-model PurchaseOrderFollowUp {
-  id              String   @id @default(cuid())
-  purchaseOrderId String?
-  title           String
-  dueDate         DateTime
-  priority        Priority @default(Normal)
-  status          String   @default("Pending")
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
-
-  @@index([dueDate])
-  @@index([purchaseOrderId])
-}
-
-model Followup {
-  id          String   @id @default(cuid())
-  vendorId    String
-  title       String
-  dueAt       DateTime
-  priority    Priority @default(Normal)
-  status      String   @default("open")
-  relatedType String?
-  relatedId   String?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  vendor Vendor @relation(fields: [vendorId], references: [id])
-
-  @@index([vendorId])
-  @@index([dueAt])
-  @@index([status])
-}
-
-model Invoice {
-  id        String   @id @default(cuid())
-  vendorId  String
-  poId      String?
-  number    String   @unique
-  issueDate DateTime
-  dueDate   DateTime
-  amount    Decimal
-  paid      Decimal  @default(0)
-  status    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  vendor Vendor         @relation(fields: [vendorId], references: [id])
-  po     PurchaseOrder? @relation(fields: [poId], references: [id], onDelete: SetNull)
-
-  @@index([vendorId])
-  @@index([dueDate])
-  @@index([status])
 }
